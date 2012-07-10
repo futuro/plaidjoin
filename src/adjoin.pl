@@ -8,14 +8,16 @@ use Getopt::Long;
 use Pod::Usage;
 use English;
 use Net::Domain qw(hostname hostfqdn hostdomain);
+use Net::DNS;
 
 my $option_results;
 
 # Defaults
-my $ldap_args="-o authzid= -o mech=gssapi";
-my $port=3268;
-my $cprinc="Administrator";
 my $container="CN=Computers";
+my $cprinc="Administrator";
+my $ldap_args="-o authzid= -o mech=gssapi";
+my $nodename=hostname();
+my $port=3268;
 my $userAccountControlBASE=4096;
 #my osvers=$(uname -r); # I don't think this will be necessary in the port
 
@@ -47,7 +49,6 @@ my $dom='';
 my $site='';
 my $baseDN='';
 my $dnssrv='';
-my $nodename='';
 my $upcase_nodename='';
 
 if ($PROGRAM_NAME eq "adleave"){
