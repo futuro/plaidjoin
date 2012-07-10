@@ -60,33 +60,33 @@ if ($PROGRAM_NAME eq "adleave"){
 # Input:
 #   N/A
 # Output:
-#   Returns 0 on success and 1 on failure
+#   Returns 1 on success and 0 on failure
 sub discover_and_set_domain {
     my $res = Net::DNS::Resolver->new;
     my $answer = $res->search('_ldap._tcp.dc._msdcs', 'SRV');
 
     # Copy $answer->string into $domain, then do a search/replace on $domain
     (($domain = $answer->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s)
-        && return(0)
-        || return(1);
+        && return(1)
+        || return(0);
 }
 
 # Check nsswitch.conf to make sure the hosts entry uses dns
 # Input:
 #   N/A
 # Output:
-#   Returns 0 for success and 1 for failure
+#   Returns 1 for success and 0 for failure
 sub check_nss_conf {
     open(my $nsswitch, "<$nssfile") or die("Can't open $nssfile: $!");
     for my $line (<$nsswitch>) {
         chomp($line);
         if ($line =~ /^hosts:.*\bdns\b.*/) {
             close($nsswitch);
-            return(0);
+            return(1);
         }
     }
     close($nsswitch);
-    return(1);
+    return(0);
 }
 
 # This is a really sub-par way to check for an ip address
@@ -96,8 +96,8 @@ sub check_nss_conf {
 sub check_dnssrv {
     my $tmp_dnssrv = shift;
     ($tmp_dnssrv =~ /[0-9.:, ]+/)
-        && return(0)
-        || return(1);
+        && return(1)
+        || return(0);
 }
 
 GetOptions(
