@@ -17,6 +17,7 @@ my $container="CN=Computers";
 my $cprinc="Administrator";
 my $ldap_args="-o authzid= -o mech=gssapi";
 my $nodename=hostname();
+my $nssfile="/etc/nsswitch.conf";
 my $port=3268;
 my $userAccountControlBASE=4096;
 #my osvers=$(uname -r); # I don't think this will be necessary in the port
@@ -70,6 +71,24 @@ sub discover_and_set_domain {
         || return(1);
 }
 
+# Check nsswitch.conf to make sure the hosts entry uses dns
+# Input:
+#   N/A
+# Output:
+#   Returns 0 for success and 1 for failure
+sub check_nss_conf {
+    open(my $nsswitch, "<$nssfile") or die("Can't open $nssfile: $!");
+    for my $line (<$nsswitch>) {
+        chomp($line);
+        if ($line =~ /^hosts:.*\bdns\b.*/) {
+            close($nsswitch);
+            return(0);
+        }
+    }
+    close($nsswitch);
+    return(1);
+}
+
 # This is a really sub-par way to check for an ip address
 # However! I'm not yet completely certain what purpose $dnssrv
 # is supposed to fulfill, so once I understand that, I'll come back and fix this.
@@ -120,6 +139,8 @@ else {
         exit(1);
     }
 }
+
+check_nss_conf() or die "$nssfile does not use dns for its hosts entry, which it (probably) should.";
 
 __END__
 
