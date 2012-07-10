@@ -45,7 +45,7 @@ my $do_config="1";
 
 # Placeholder vars
 my $dc='';
-my $dom='';
+my $domain='';
 my $site='';
 my $baseDN='';
 my $dnssrv='';
@@ -58,7 +58,7 @@ if ($PROGRAM_NAME eq "adleave"){
 # This is a really sub-par way to check for an ip address
 # However! I'm not yet completely certain what purpose $dnssrv
 # is supposed to fulfill, so once I understand that, I'll come back and fix this.
-# TODO: See above.
+# TODO: See above paragraph.
 sub check_dnssrv {
     my $tmp_dnssrv = shift;
     ($tmp_dnssrv =~ /[0-9.:, ]+/)
@@ -90,7 +90,7 @@ pod2usage(-exitstatus => 0, -verbose => 2) if $man;
 check_dnssrv($dnssrv) || pod2usage(2);
 
 if ($#ARGV >= 0) {
-    $dom = $ARGV[0];
+    $domain = $ARGV[0];
     if ($#ARGV >= 1) {
         $nodename = $ARGV[1];
     }
