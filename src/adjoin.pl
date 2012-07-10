@@ -89,9 +89,13 @@ pod2usage(-exitstatus => 0, -verbose => 2) if $man;
 # Make sure we have a proper dnssrv listing
 check_dnssrv($dnssrv) || pod2usage(2);
 
-$nodename=hostname();
 if ($#ARGV >= 0) {
     $dom = $ARGV[0];
+    if ($#ARGV >= 1) {
+        $nodename = $ARGV[1];
+    }
+}
+else {
 }
 
 __END__
