@@ -55,6 +55,21 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Discover the domain and set $domain to it
+# Input:
+#   N/A
+# Output:
+#   Returns 0 on success and 1 on failure
+sub discover_and_set_domain {
+    my $res = Net::DNS::Resolver->new;
+    my $answer = $res->search('_ldap._tcp.dc._msdcs', 'SRV');
+
+    # Copy $answer->string into $domain, then do a search/replace on $domain
+    (($domain = $answer->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s)
+        && return(0)
+        || return(1);
+}
+
 # This is a really sub-par way to check for an ip address
 # However! I'm not yet completely certain what purpose $dnssrv
 # is supposed to fulfill, so once I understand that, I'll come back and fix this.
@@ -96,6 +111,14 @@ if ($#ARGV >= 0) {
     }
 }
 else {
+    if (discover_and_set_domain()) {
+        print "Joining domain: $domain\n";
+    }
+    else {
+        print "No domain was specified and one could not be discovered.\n";
+        print "Please check your DNS resolver configuration\n";
+        exit(1);
+    }
 }
 
 __END__
