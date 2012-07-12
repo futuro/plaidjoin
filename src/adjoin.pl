@@ -15,6 +15,7 @@ my $option_results;
 # Defaults
 my $container="CN=Computers";
 my $cprinc="Administrator";
+my $fqdn=hostfqdn();
 my $ldap_args="-o authzid= -o mech=gssapi";
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
@@ -48,6 +49,7 @@ my $do_config="1";
 my $dc='';
 my $domain='';
 my $site='';
+my $netbios_nodename='';
 my $baseDN='';
 my $dnssrv='';
 my $upcase_nodename='';
@@ -140,7 +142,20 @@ else {
     }
 }
 
-check_nss_conf() or die "$nssfile does not use dns for its hosts entry, which it (probably) should.";
+check_nss_conf() or die "$nssfile does not use dns for hosts, which it (probably) should.\n";
+
+$upcase_nodename  = uc($nodename);
+$netbios_nodename = "$nodename\$";
+# This is probably wrong. What about a machine that's foo.cs.umn.edu and the domain
+# it should join is COSE.UMN.EDU? A bit unorthodox perhaps, but possible.
+# TODO: Investigate this possibility.
+# XXX: There is a possibility fqdn should be put together like the following. I /really/ doubt
+#       it, and assume, instead, that the original implementation was either flawed, or did not
+#       account for a machine with a different domain than the domain it's joining. This should
+#       be verified and, if true, remove this comment block.
+#$fqdn = "$nodename.$dom";
+
+print "Looking for domain controllers and global catalogs (A RRs)\n"
 
 __END__
 
