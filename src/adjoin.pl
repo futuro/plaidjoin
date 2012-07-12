@@ -58,6 +58,49 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Find the canonical name for a domainname
+# Input:
+#   Str: The domain name to search for
+# Ouput:
+#   Str: The canonical FQDN for the domain
+#   OR
+#   '' : The empty string (if the input doesn't resolve to anything)
+sub canon_resolve {
+    my $name = shift;
+
+    my $cname = '';
+
+    my $query = Net::DNS::Resolver->new;
+    my $response = $query->search($name, 'A');
+
+    if (!$response) {
+        warn "ERROR: Host \"$name\" does not resolve properly.\n";
+        warn "ERROR: \tMake sure that you specify a valid host name;\n";
+        warn "ERROR: \teither in short (when you have a list of domains\n";
+        warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
+        warn "ERROR: \ta fully qualified domain name.\n";
+        return '';
+    }
+
+    # As designated in RFC 1034, when we search for an 'A' record, if a 'CNAME' record
+    # exists, we'll get both the 'CNAME' and the 'A' record(s) for the canonical name.
+    # As such, we'll search for the 'CNAME' record and use it, but if not, then the 'A'
+    # record returned will hold the canonical name for whatever we searched for.
+    ANSWER:
+        for my $answer ($response->answer) {
+            if ($answer->type eq "CNAME") {
+                # Found it; save it and exit the loop
+                $cname = $answer->cname;
+                last ANSWER;
+            }
+            else {
+                $cname = $answer->name;
+            }
+        }
+
+    return $cname;
+}
+
 # Discover the domain and set $domain to it
 # Input:
 #   N/A
