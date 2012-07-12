@@ -125,7 +125,11 @@ pod2usage(-exitstatus => 0, -verbose => 2) if $man;
 # Make sure we have a proper dnssrv listing
 check_dnssrv($dnssrv) || pod2usage(2);
 
-if ($#ARGV >= 0) {
+if ($#ARGV >= 2) {
+    print "Too many things specified on the command line.\n";
+    pod2usage(2);
+}
+elsif ($#ARGV >= 0) {
     $domain = $ARGV[0];
     if ($#ARGV >= 1) {
         $nodename = $ARGV[1];
