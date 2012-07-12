@@ -64,11 +64,11 @@ if ($PROGRAM_NAME eq "adleave"){
 # Output:
 #   Returns 1 on success and 0 on failure
 sub discover_and_set_domain {
-    my $res = Net::DNS::Resolver->new;
-    my $answer = $res->search('_ldap._tcp.dc._msdcs', 'SRV');
+    my $query = Net::DNS::Resolver->new;
+    my $response = $query->search('_ldap._tcp.dc._msdcs', 'SRV');
 
-    # Copy $answer->string into $domain, then do a search/replace on $domain
-    (($domain = $answer->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s)
+    # Copy $response->string into $domain, then do a search/replace on $domain
+    (($domain = $response->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s)
         && return(1)
         || return(0);
 }
@@ -91,7 +91,7 @@ sub check_nss_conf {
     return(0);
 }
 
-# This is a really sub-par way to check for an ip address
+# This is a really sub-par way to check for an ip address (any string of numbers works, f.e.)
 # However! I'm not yet completely certain what purpose $dnssrv
 # is supposed to fulfill, so once I understand that, I'll come back and fix this.
 # TODO: See above paragraph.
