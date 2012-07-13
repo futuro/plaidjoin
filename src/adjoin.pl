@@ -60,6 +60,77 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Convert an AD-style domain DN to a DNS domainname
+# This will convert regardless of case.
+# Input:
+#   Str: The DN to convert
+# Output:
+#   Str: The converted DN
+#   OR
+#   '' : There was no DN to convert
+sub dn2dns {
+    my $dnDNS = '';
+
+    my $DN = shift;
+
+    if ($DN) {
+        $DN =~ s/^DC=//i;
+        $DN =~ s/,DC=/\./gi;
+        $dnDNS = $DN;
+    }
+
+    return $dnDNS;
+}
+
+# Convert a DNS domainname to an AD-style DN for that domain
+# Input:
+#   Str: The domain name to convert
+# Output:
+#   Str: The converted domain name
+#   OR
+#   '' : There was no domain to convert
+sub dns2dn {
+    my $dnsDN = '';
+
+    my $domainname = shift;
+
+    if ($domainname) {
+        $domainname =~ s/\./,DC=/g;
+        $dnsDN = "DC=" . $domainname;
+    }
+
+    return $dnsDN;
+}
+
+# Form a base DN from a DNS domainname and container
+# Input:
+#   Str: 'container' holds the container to use
+#   Str: 'domainname' holds the domainname to use
+# Output:
+#   Str: The 'baseDN' that was created
+#   OR
+#   '' : The empty string, because nothing was given or found
+sub get_base_dn {
+    my $baseDN = '';
+
+    my $container  = '';
+    my $domainname = '';
+
+    my $dnsDN = '';
+
+    if ($#ARGV == 1) {
+        $container = (shift) . ",";
+    }
+
+    if ($#ARGV == 0) {
+        $domainname = shift;
+        $dnsDN      = dns2dn($domainname);
+        $baseDN     = $container . $dnsDN;
+    }
+
+    return $baseDN;
+}
+
 # Find the canonical name for a domainname
 # Input:
 #   Str: The domain name to search for
