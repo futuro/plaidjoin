@@ -1,0 +1,3 @@
+'--dnssrv', and it's variable '$dnssrv', aren't used in /every/ DNS query. This seems wrong,
+and should probably be fixed so that every DNS query will look at '$dnssrv'. I don't know
+exactly how I want to do that at the moment...
