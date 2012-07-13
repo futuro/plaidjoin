@@ -46,12 +46,14 @@ my $do_config="1";
 #my $verbose_cat="1";
 
 # Placeholder vars
-my $dc='';
-my $domain='';
-my $site='';
-my $netbios_nodename='';
 my $baseDN='';
+my $dc='';
 my $dnssrv='';
+my $domain='';
+my $DomainDnsZones='';
+my $ForestDnsZones='';
+my $netbios_nodename='';
+my $site='';
 my $upcase_nodename='';
 
 if ($PROGRAM_NAME eq "adleave"){
