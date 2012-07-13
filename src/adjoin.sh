@@ -143,6 +143,8 @@ getBaseDN ()
 }
 
 
+#XXX: This doesn't make any sense. Why not just get the CNAME RR? Aside
+#		from a collision, when would anything else ever be useful?
 # Resolve a domainname to its canonical name, and shorten it if possible
 #
 # (Short names are preferred only for testing, so we can have a DNS
