@@ -131,6 +131,9 @@ dn2dns ()
     print ${dname#.}
 }
 
+# XXX: I can't imagine how this function ever worked.
+# 		It checks to see if '$2' is empty, and if it isn't, it will do foo,
+# 		but if it /is/ empty, it will do bar, both of which still use '$2'
 # Form a base DN from a DNS domainname and container
 getBaseDN ()
 {
