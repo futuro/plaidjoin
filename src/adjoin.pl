@@ -50,10 +50,13 @@ my $baseDN='';
 my $dc='';
 my $dnssrv='';
 my $domain='';
+my $domain_controller='';
 my $DomainDnsZones='';
 my $ForestDnsZones='';
+my $kdc='';
 my $netbios_nodename='';
-my $site='';
+my $realm='';
+my $site=''; # This variable is never used in adjoin.sh
 my $upcase_nodename='';
 
 if ($PROGRAM_NAME eq "adleave"){
@@ -275,7 +278,16 @@ $netbios_nodename = "$nodename\$";
 #       be verified and, if true, remove this comment block.
 #$fqdn = "$nodename.$dom";
 
-print "Looking for domain controllers and global catalogs (A RRs)\n"
+print "Looking for domain controllers and global catalogs (A RRs)\n";
+$DomainDnsZones = canon_resolve("DomainDnsZones.$domain.");
+$ForestDnsZones = canon_resolve("ForestDnsZones.$domain.");
+
+$realm = uc($domain);
+
+$baseDN = get_base_dn($container, $domain);
+
+print "Looking for KDCs and DCs (SRV RRs)";
+$kdc = getKDC();
 
 __END__
 
