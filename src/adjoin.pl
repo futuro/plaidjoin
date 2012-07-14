@@ -177,19 +177,22 @@ sub canon_resolve {
     return $cname;
 }
 
-# Discover the domain and set $domain to it
+# Discover the domain
 # Input:
 #   N/A
 # Output:
-#   Returns 1 on success and 0 on failure
-sub discover_and_set_domain {
+#   Str: The found domain (without the ending dot)
+#   OR
+#   '' : The empty string (nothing found)
+sub discover_domain {
     my $query = Net::DNS::Resolver->new;
     my $response = $query->search('_ldap._tcp.dc._msdcs', 'SRV');
 
+    my $domain = '';
+
     # Copy $response->string into $domain, then do a search/replace on $domain
-    (($domain = $response->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s)
-        && return(1)
-        || return(0);
+    ($domain = $response->string) =~ s/.*_ldap._tcp.dc._msdcs.([\w.]+)\.\s.*/$1/s;
+    return $domain;
 }
 
 # Check nsswitch.conf to make sure the hosts entry uses dns
@@ -255,7 +258,8 @@ elsif ($#ARGV >= 0) {
     }
 }
 else {
-    if (discover_and_set_domain()) {
+    $domain = discover_domain();
+    if ($domain) {
         print "Joining domain: $domain\n";
     }
     else {
