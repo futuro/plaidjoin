@@ -63,6 +63,21 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Return an array of hosts and port combos gleaned from SRV records
+# XXX: Do I really want a hash?
+# Input:
+#   Str  : entry to search for
+# Output:
+#   Array:
+
+# Find the Key Distribution Center (KDC)
+# Input:
+#   N/A
+# Output:
+#   Str: The found KDC
+sub getKDC {
+}
+
 # Convert an AD-style domain DN to a DNS domainname
 # This will convert regardless of case.
 # Input:
