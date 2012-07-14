@@ -378,6 +378,8 @@ getSRVs ()
     typeset srv port query
     [[ -n "$dnssrv" ]] && dig_arg1="@$dnssrv"
     $verbose dig $dig_arg1 "$1" SRV +short 1>&2
+	# Get all of the SRV records for $1 then print out the host name (sans ending period)
+	# and the port number
     dig $dig_arg1 "$1" SRV +short|sort -n|while read j j port srv
     do
 	print -- ${srv%.} $port
@@ -432,9 +434,12 @@ getKDC ()
 {
     typeset j
 
+	# Find a list of all kpasswd servers
     set -A KPWs -- $(getSRVs _kpasswd._tcp.$dom.)
+	# save the first one (host name only)
     kpasswd=${KPWs[0]}
 
+	# '$sitename' is a global; its instantiation is hidden in getSite() I believe
     if [[ -n "$siteName" ]]
     then
 	set -A KDCs -- $(getSRVs _kerberos._tcp.$siteName._sites.$dom.)
@@ -531,6 +536,7 @@ dc=
 dom=
 osvers=$(uname -r)
 port=3268
+# This variable is never used.
 site=
 force=false
 extra_force=false
