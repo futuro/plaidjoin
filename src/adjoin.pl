@@ -68,7 +68,32 @@ if ($PROGRAM_NAME eq "adleave"){
 # Input:
 #   Str  : entry to search for
 # Output:
-#   Array:
+#   Array: The collection of SRV records found
+#   OR
+#   ()   : Nothing was found
+sub getSRVs {
+    my $name = shift;
+
+    my @answers = ();
+
+    # TODO: I have temporarily skipped on incorporating the '$dnssrv' option
+    # into this function, as I will probably have to rethink how to approach its
+    # incorporation in every DNS query.
+
+    # TODO: I find I'm doing this a lot, in different functions. I should figure out how to make this
+    # less replicated
+    my $query = Net::DNS::Resolver->new;
+    my $response = $query->search($name, 'SRV');
+
+    if (!$response) {
+        warn "ERROR: FQDN \"$name\" does not resolve properly.\n";
+        warn "ERROR: \tMake sure that you specify a valid host name;\n";
+        warn "ERROR: \teither in short (when you have a list of domains\n";
+        warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
+        warn "ERROR: \ta fully qualified domain name.\n";
+        return '';
+    }
+}
 
 # Find the Key Distribution Center (KDC)
 # Input:
