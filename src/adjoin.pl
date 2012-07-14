@@ -165,7 +165,7 @@ sub canon_resolve {
     my $response = $query->search($name, 'A');
 
     if (!$response) {
-        warn "ERROR: Host \"$name\" does not resolve properly.\n";
+        warn "ERROR: FQDN \"$name\" does not resolve properly.\n";
         warn "ERROR: \tMake sure that you specify a valid host name;\n";
         warn "ERROR: \teither in short (when you have a list of domains\n";
         warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
