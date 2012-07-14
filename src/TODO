@@ -1,3 +1,10 @@
 '--dnssrv', and it's variable '$dnssrv', aren't used in /every/ DNS query. This seems wrong,
 and should probably be fixed so that every DNS query will look at '$dnssrv'. I don't know
 exactly how I want to do that at the moment...
+
+Figure out what to do with '$site'. It's never used in adjoin.sh, so I'm not really
+certain what it's intended purpose was, but perhaps it was supposed to be used with the
+'getSite()' function. I assume I'll know more once I get down to that part of the file,
+but it's somewhat vexing to deal with.
+
+vim: tw=90
