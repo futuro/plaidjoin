@@ -63,6 +63,47 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Do a DNS search for the 'record' associated with 'name'
+# TODO: Think about better incorporating the verbose variable (is it only for warnings,
+#       or should it be for everything.
+# Defaults:
+#   'record' : 'A'
+#   'verbose': ''
+# Input:
+#   Str   : The 'name' to search for
+#   [Str] : The 'record' to search for
+#   [Bool]: Whether to be verbose or not
+# Output:
+#   Array : The results
+#   OR
+#   ()    : The empty array, if nothing was found
+sub dns_search {
+    my $name = shift;
+    my $record = (shift || 'A');
+    my $verbose = (shift || '');
+
+    my @answers = ();
+
+    my $query = Net::DNS::Resolver->new;
+    # XXX: I'm not sure what happens if you try to search for '' or UNDEF, so I'll have to
+    #       check that out once I get back to internet
+    my $response = $query->search($name, $record);
+
+    if (!$response) {
+        if ($verbose) {
+            warn "ERROR: FQDN \"$name\" does not resolve properly.\n";
+            warn "ERROR: \tMake sure that you specify a valid host name;\n";
+            warn "ERROR: \teither in short (when you have a list of domains\n";
+            warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
+            warn "ERROR: \ta fully qualified domain name.\n";
+        }
+        # XXX: Is this bad? To return from the middle? I rather prefer to return at the end of the
+        #       function if I can (well, I want only one exit point for the function, where that is
+        #       doesn't matter too much.)
+        return '';
+    }
+}
+
 # Return an array of hosts and port combos gleaned from SRV records
 # XXX: Do I actually want a hash?
 # Input:
