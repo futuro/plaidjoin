@@ -64,7 +64,7 @@ if ($PROGRAM_NAME eq "adleave"){
 }
 
 # Return an array of hosts and port combos gleaned from SRV records
-# XXX: Do I really want a hash?
+# XXX: Do I actually want a hash?
 # Input:
 #   Str  : entry to search for
 # Output:
