@@ -66,6 +66,7 @@ if ($PROGRAM_NAME eq "adleave"){
 # Do a DNS search for the 'record' associated with 'name'
 # TODO: Think about better incorporating the verbose variable (is it only for warnings,
 #       or should it be for everything.
+# XXX: Is it better for this to return a list of strings, or objects? I'm leaning towards strings
 # Defaults:
 #   'record' : 'A'
 #   'verbose': ''
@@ -82,7 +83,7 @@ sub dns_search {
     my $record = (shift || 'A');
     my $verbose = (shift || '');
 
-    my @answers = ();
+    my @results = ();
 
     my $query = Net::DNS::Resolver->new;
     # XXX: I'm not sure what happens if you try to search for '' or UNDEF, so I'll have to
@@ -102,6 +103,12 @@ sub dns_search {
         #       doesn't matter too much.)
         return '';
     }
+
+    for my $answer ($response->answer) {
+        push(@results, $answer->string);
+    }
+
+    return @results;
 }
 
 # Return an array of hosts and port combos gleaned from SRV records
