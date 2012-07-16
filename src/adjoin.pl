@@ -66,7 +66,6 @@ if ($PROGRAM_NAME eq "adleave"){
 # Do a DNS search for the 'record' associated with 'name'
 # TODO: Think about better incorporating the verbose variable (is it only for warnings,
 #       or should it be for everything.
-# XXX: Is it better for this to return a list of strings, or objects? I'm leaning towards strings
 # Defaults:
 #   'record' : 'A'
 #   'verbose': ''
@@ -75,7 +74,7 @@ if ($PROGRAM_NAME eq "adleave"){
 #   [Str] : The 'record' to search for
 #   [Bool]: Whether to be verbose or not
 # Output:
-#   Array : The results
+#   Array : Net::DNS::Packet objects, one per answer
 #   OR
 #   ()    : The empty array, if nothing was found
 sub dns_search {
@@ -90,22 +89,17 @@ sub dns_search {
     #       check that out once I get back to internet
     my $response = $query->search($name, $record);
 
-    if (!$response) {
+    if ($response) {
+        @results = $response->answer;
+    }
+    else {
         if ($verbose) {
-            warn "ERROR: FQDN \"$name\" does not resolve properly.\n";
+            warn "ERROR: Name \"$name\" does not resolve properly.\n";
             warn "ERROR: \tMake sure that you specify a valid host name;\n";
             warn "ERROR: \teither in short (when you have a list of domains\n";
             warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
             warn "ERROR: \ta fully qualified domain name.\n";
         }
-        # XXX: Is this bad? To return from the middle? I rather prefer to return at the end of the
-        #       function if I can (well, I want only one exit point for the function, where that is
-        #       doesn't matter too much.)
-        return '';
-    }
-
-    for my $answer ($response->answer) {
-        push(@results, $answer->string);
     }
 
     return @results;
