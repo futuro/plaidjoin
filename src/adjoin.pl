@@ -113,29 +113,28 @@ sub dns_search {
 # Output:
 #   Array[Hash]: The collection of SRV records found, an Array of Hashes
 #   OR
-#   ()   : Nothing was found
-sub getSRVs {
+#   ()       : Nothing was found
+sub get_SRVs {
     my $name = shift;
 
-    my @answers = ();
+    my @SRVs = ();
+
+    my @results = dns_search($name, 'SRV');
 
     # TODO: I have temporarily skipped on incorporating the '$dnssrv' option
     # into this function, as I will probably have to rethink how to approach its
     # incorporation in every DNS query.
 
-    # TODO: I find I'm doing this a lot, in different functions. I should figure out how to make this
-    # less replicated
-    my $query = Net::DNS::Resolver->new;
-    my $response = $query->search($name, 'SRV');
-
-    if (!$response) {
-        warn "ERROR: FQDN \"$name\" does not resolve properly.\n";
-        warn "ERROR: \tMake sure that you specify a valid host name;\n";
-        warn "ERROR: \teither in short (when you have a list of domains\n";
-        warn "ERROR: \tto search stored in your resolv.conf file) or as\n";
-        warn "ERROR: \ta fully qualified domain name.\n";
-        return '';
+    for my $answer (@results) {
+        if ($answer->type eq "SRV") {
+            push(@SRVs,
+                     { name => $answer->target,
+                       port => $answer->port });
+        }
     }
+
+    return @SRVs;
+
 }
 
 # Find the Key Distribution Centers (KDCs)
