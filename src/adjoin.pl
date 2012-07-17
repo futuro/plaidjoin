@@ -56,6 +56,9 @@ my $DomainDnsZones='';
 my $ForestDnsZones='';
 my $kdc='';
 my @KDClist=();
+my $kpasswd='';
+my @KPWlist=();
+my $krb5conf='';
 my $netbios_nodename='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
@@ -430,12 +433,29 @@ if (!@DClist) {
 else {
     $dc     = $DClist[0]->{name};
 }
+
+@KPWlist = get_KPWs($domain);
+if (!@KPWlist) {
+    # TODO: Make a function to test the @KDClist servers, using port 464, to find a server
+    #       that works. I should use Net::Ping, methinks.
+    warn "We can't find a kpasswd server in DNS, so we're assuming the KDC works.\n";
+    warn "This is probably wrong.\n";
+    $kpasswd = $kdc;
+}
+else {
+    $kpasswd = $KPWlist[0]->{name};
+}
+
 print "\nKDCs\n----";
 for my $pair (@KDClist) {
     print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
 }
 print "\nDCs\n----";
 for my $pair (@DClist) {
+    print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+}
+print "\nkpasswd servers\n----";
+for my $pair (@KPWlist) {
     print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
 }
 
