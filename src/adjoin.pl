@@ -48,12 +48,14 @@ my $do_config="1";
 # Placeholder vars
 my $baseDN='';
 my $dc='';
+my @DClist=();
 my $dnssrv='';
 my $domain='';
 my $domain_controller='';
 my $DomainDnsZones='';
 my $ForestDnsZones='';
 my $kdc='';
+my @KDClist=();
 my $netbios_nodename='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
@@ -142,9 +144,41 @@ sub get_SRVs {
 #   Str: The domain we're searching in
 #   Str: The sitename we're using TODO:XXX: What is this variable for?
 # Output:
-#   Str: The found KDC
-sub getKDC {
+#   Array[Hash]: A list of hashes holding the name and port for the KDC's
+#   OR
+#   () : The empty list
+sub get_KDCs {
+    my $domain   = (shift || '');
+    my $sitename = (shift || '');
+
+    # Format '$sitename' for inclusion in the 'get_SRVs' function call, regardless
+    # of it's contents (if it's empty, it stays empty)
+    $sitename =~ s/(.+)/.$1._sites/;
+
+    return get_SRVs("_kerberos._tcp".$sitename.".$domain.");
 }
+
+# TODO: get_KDCs and get_DCs are almost identical; I should figure out how to merge them.
+# Find the Domain Controllers (DCs)
+# Input:
+#   Str: The Domain we're searching in
+#   Str: The sitename we're using TODO:XXX: What is this variable for?
+# Output:
+#   Array[Hash]: A list of hashes holding the name and port for the DC's
+#   OR
+#   () : The empty list
+sub get_DCs {
+    my $domain   = (shift || '');
+    my $sitename = (shift || '');
+
+    # Format '$sitename' for inclusion in the 'get_SRVs' function call, regardless
+    # of it's contents (if it's empty, it stays empty)
+    $sitename =~ s/(.+)/.$1._sites/;
+
+    return get_SRVs("_ldap._tcp".$sitename.".dc._msdcs.$domain.");
+
+}
+
 
 # Convert an AD-style domain DN to a DNS domainname
 # This will convert regardless of case.
@@ -363,8 +397,34 @@ $realm = uc($domain);
 
 $baseDN = get_base_dn($container, $domain);
 
-print "Looking for KDCs and DCs (SRV RRs)";
-$kdc = getKDC();
+print "Looking for KDCs and DCs (SRV RRs)\n";
+@KDClist = get_KDCs($domain);
+if (!@KDClist){
+    # XXX: What if '$DomainDnsZones' is empty? Same for '$ForestDnsZones'
+    @KDClist = ({ name => $DomainDnsZones, port => 88 });
+    $kdc     = $ForestDnsZones;
+}
+else {
+    $kdc     = $KDClist[0]->{name};
+}
+
+@DClist = get_DCs($domain);
+if (!@DClist) {
+    # XXX: What if '$DomainDnsZones' is empty?
+    @DClist = ({ name => $DomainDnsZones, port => 389 });
+    $dc     = $DomainDnsZones;
+}
+else {
+    $dc     = $DClist[0]->{name};
+}
+print "\nKDCs\n----";
+for my $pair (@KDClist) {
+    print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+}
+print "\nDCs\n----";
+for my $pair (@DClist) {
+    print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+}
 
 __END__
 
