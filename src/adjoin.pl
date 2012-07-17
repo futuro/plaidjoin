@@ -105,6 +105,19 @@ sub dns_search {
     return @results;
 }
 
+# Returns the kpasswd servers defined in DNS
+# Input:
+#   Str: The domain we're searching for
+# Output:
+#   Array[Hash] : A list of hashes holding the name and port for the KPASSWD servers
+#   OR
+#   ()          : The empty list, if there aren't any such servers
+sub get_KPWs {
+    my $domain = (shift || '');
+
+    return get_SRVs("_kpasswd._tcp.$domain.");
+}
+
 # Return an array of hosts and port combos gleaned from SRV records
 # XXX: Do I actually want a hash? Maybe I want a list of lists?
 #       I think I want a list of hashes. Less magic numbers, more magic names
