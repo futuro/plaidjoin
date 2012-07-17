@@ -430,14 +430,18 @@ getDC ()
     dc=$DomainDnsZones
 }
 
+# Set KDCs, KPWs, kpasswd, and  kdc
 getKDC ()
 {
     typeset j
 
+	# TODO: This should be its own function, getKpasswd
+	# This script makes me want to cry
 	# Find a list of all kpasswd servers
     set -A KPWs -- $(getSRVs _kpasswd._tcp.$dom.)
 	# save the first one (host name only)
     kpasswd=${KPWs[0]}
+	# XXX: KPWs is never referenced again, globally included
 
 	# '$sitename' is a global; its instantiation is hidden in getSite() I believe
     if [[ -n "$siteName" ]]
@@ -453,6 +457,7 @@ getKDC ()
     [[ -n "$kdc" ]] && return
 
     # Default
+	# XXX: Why is this adding to the KDCs array?
     set -A KDCs -- $DomainDnsZones 88
     kdc=$ForestDnsZones
 
@@ -493,6 +498,7 @@ write_krb5_conf ()
 [realms]
 	$realm = {
 EOF
+	# I think this is referencing the KDCs variable set/edited up in getKDC
     for i in ${KDCs[@]}
     do
 	[[ "$i" = +([0-9]) ]] && continue
@@ -621,6 +627,9 @@ getBaseDN "$container" "$dom"
 print "Looking for KDCs and DCs (SRV RRs)"
 getKDC
 getDC
+# The following pulls the KDCs array created/altered in getKDC.
+# The same is probably true for DCs. I live in global variable hell...
+# This will print out every KDC/Port pair
 cat <<EOF
 	KDCs = ${KDCs[*]}
 	DCs = ${DCs[*]}
@@ -664,6 +673,7 @@ else
     getKDC
     getDC
     getGC
+	# These are all defined in the preceding functions (More global variables!!!)
     cat <<EOF
 	Local KDCs = ${KDCs[*]}
 	Local DCs  = ${DCs[*]}
