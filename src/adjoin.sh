@@ -485,6 +485,8 @@ getForestName ()
     forest=${forest#.}
 }
 
+# This constructs a string representing what should be in krb5.conf,
+# dumps it into a temp file, then returns the path to that temp file
 write_krb5_conf ()
 {
     cf=$(mktemp -t -p /tmp adjoin-krb5.conf.XXXXXX)
