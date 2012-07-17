@@ -9,6 +9,7 @@ use Pod::Usage;
 use English;
 use Net::Domain qw(hostname hostfqdn hostdomain);
 use Net::DNS;
+use File::Temp qw(tempfile);
 
 my $option_results;
 
@@ -106,6 +107,65 @@ sub dns_search {
     }
 
     return @results;
+}
+
+# Construct the contents of the new krb5.conf file, write them into a temp file,
+# then return that file name.
+# Input:
+#   Array[Hash] : The list of KDCs
+#   Str         : The kpasswd server string
+#   Str         : The realm we're connecting to
+#   Str         : The template to use when constructing the temp file (Optional)
+# Output:
+#   Str         : The name of the temporary file
+#   OR
+#   ''          : Nothing was passed to the function, so nothing was constructed
+sub construct_krb5_conf {
+    my @KDClist  = @{(shift || [])};
+    my $kpasspwd = (shift || '');
+    my $realm    = (shift || '');
+    my $template = (shift || 'adjoin-krb5.conf.XXXXXX');
+
+    my $fh;
+    my $filename;
+
+    my $krb5conf   = '';
+    my $kdcstrings = "";
+
+    if (!@KDClist || !$kpasswd || !$realm) {
+        warn "Missing KDClist, kpasswd, and realm entries in construct_krb5_conf.\n";
+        warn "Returning the empty list.\n";
+        return '';
+    }
+
+    for my $pair (@KDClist) {
+        $kdcstrings .= "kdc = ${$pair}{name}\n\t";
+    }
+    # TODO: Is there a better way to do this?
+    $kdcstrings =~ s/\n\t$//;
+
+    $krb5conf = <<ENDCONF;
+[libdefaults]
+    default_realm = $realm
+
+[realms]
+    $realm = {
+        $kdcstrings
+        admin_server = $kpasswd
+        kpasswd_server = $kpasswd
+        kpasswd_protocol = SET_CHANGE
+    }
+
+[domain_realm]
+    .$domain = $realm
+    $domain = $realm
+ENDCONF
+
+    ($fh, $filename) = tempfile( $template, DIR => '/tmp' );
+    print $fh $krb5conf;
+    close $fh;
+
+    return $filename;
 }
 
 # Returns the kpasswd servers defined in DNS
@@ -458,6 +518,8 @@ print "\nkpasswd servers\n----";
 for my $pair (@KPWlist) {
     print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
 }
+
+$krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
 
 __END__
 
