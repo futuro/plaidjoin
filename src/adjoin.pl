@@ -74,7 +74,7 @@ if ($PROGRAM_NAME eq "adleave"){
 #   [Str] : The 'record' to search for
 #   [Bool]: Whether to be verbose or not
 # Output:
-#   Array : Net::DNS::Packet objects, one per answer
+#   Array : Net::DNS::RR objects, one per answer
 #   OR
 #   ()    : The empty array, if nothing was found
 sub dns_search {
@@ -104,11 +104,14 @@ sub dns_search {
 }
 
 # Return an array of hosts and port combos gleaned from SRV records
-# XXX: Do I actually want a hash?
+# XXX: Do I actually want a hash? Maybe I want a list of lists?
+#       I think I want a list of hashes. Less magic numbers, more magic names
+#       The downside to this is that you have to know there is a "name" and "port"
+#       key in that hash. Is there a better way to do this?
 # Input:
 #   Str  : entry to search for
 # Output:
-#   Array: The collection of SRV records found
+#   Array[Hash]: The collection of SRV records found, an Array of Hashes
 #   OR
 #   ()   : Nothing was found
 sub getSRVs {
@@ -135,9 +138,10 @@ sub getSRVs {
     }
 }
 
-# Find the Key Distribution Center (KDC)
+# Find the Key Distribution Centers (KDCs)
 # Input:
-#   N/A
+#   Str: The domain we're searching in
+#   Str: The sitename we're using TODO:XXX: What is this variable for?
 # Output:
 #   Str: The found KDC
 sub getKDC {
@@ -415,6 +419,7 @@ Options:
 	catalog server [Default: discover one]
  -p ...	Name of an administrator principal to use for creating
 	the computer account [default: Administrator]
+ -D Set the DNS server to use
 
 Other options:
 
@@ -422,7 +427,6 @@ Other options:
  -x	Debug
 
 TODO:
- -D TODO: This does something, but I'm not sure what yet.
 
 Examples:
 
