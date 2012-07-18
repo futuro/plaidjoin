@@ -59,8 +59,10 @@ my $kdc='';
 my @KDClist=();
 my $kpasswd='';
 my @KPWlist=();
+my $krb5ccname='';
 my $krb5conf='';
 my $netbios_nodename='';
+my $new_keytab='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
 my $upcase_nodename='';
@@ -452,6 +454,11 @@ else {
     }
 }
 
+if (!$cprinc){
+    print "Please specify the administrative principal to use: ";
+    chomp($cprinc = <STDIN>);
+}
+
 check_nss_conf() or die "$nssfile does not use dns for hosts, which it (probably) should.\n";
 
 $upcase_nodename  = uc($nodename);
@@ -520,6 +527,10 @@ for my $pair (@KPWlist) {
 }
 
 $krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
+(undef, $krb5ccname) = tempfile("adjoin-krb5ccache.XXXXXX", OPEN => 0);
+(undef, $new_keytab) = tempfile("adjoin-krb5keytab.XXXXXX", OPEN => 0);
+
+#TODO: Past here, we will need Authen::Krb5 and family.
 
 __END__
 
