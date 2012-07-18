@@ -4,11 +4,14 @@ use strict;
 use warnings;
 
 use Carp;
+use English;
+
 use Getopt::Long;
 use Pod::Usage;
-use English;
+
 use Net::Domain qw(hostname hostfqdn hostdomain);
 use Net::DNS;
+
 use File::Temp qw(tempfile);
 
 my $option_results;
