@@ -70,6 +70,21 @@ my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
 my $upcase_nodename='';
 
+# Do some cleanup if we're exiting
+END {
+    my $exitval = $?;
+    # Make sure we're only removing files in /tmp
+    # This probably isn't 100%, super-duper-ultra-mega secure, but I hope it's secure enough that
+    # to accidentally shoot yourself in the foot with a messed up '$krb5ccname' would be /almost/
+    # impossible.
+    if ( $krb5ccname =~ m:/tmp/\w+:) {
+        # We don't care whether these succeed or not
+        system("kdestroy -q -c $krb5ccname") if $krb5ccname;
+        system("rm -f $krb5ccname")          if $krb5ccname;
+    }
+    $? = $exitval;
+}
+
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
