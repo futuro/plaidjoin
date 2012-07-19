@@ -19,9 +19,11 @@ use File::Temp qw(tempfile);
 my $option_results;
 
 # Defaults
+my $cname_template="adjoin-krb5ccache.XXXXXX";
 my $container="CN=Computers";
 my $cprinc="Administrator";
 my $fqdn=hostfqdn();
+my $keytab_template="adjoin-krb5keytab.XXXXXX";
 my $ldap_args="-o authzid= -o mech=gssapi";
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
@@ -89,6 +91,35 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Find the forest name
+# NOTE: I'm not sure if this is ever different from the '$domain' value passed in or discovered.
+#       It would be really nice to know.
+# Input:
+#   Str: The locate of the Kerberos Ticket cache file
+#   Str: The domain controller to connect to
+# Output:
+#   Str: The found forest value
+sub find_forest {
+    my $ccname            = (shift || ''); # This should probably fail...
+    my $domain_controller = (shift || ''); # This too
+
+    my $forest = '';
+    my @results = ();
+
+    my $ldap_options = '-Q -Y gssapi -b "" -s base "" schemaNamingContext';
+
+    $ccname = "KRB5CCNAME=$ccname";
+
+    @results = qx($ccname ldapsearch -h $domain_controller $ldap_options);
+
+    for my $line (@results) {
+        if ($line =~ /^schema/) {
+            $line =~ s/^\w+: CN=\w+,CN=\w+,//;
+            $forest = dn2dns($line);
+        }
+    }
 }
 
 # Do a DNS search for the 'record' associated with 'name'
@@ -547,10 +578,17 @@ for my $pair (@KPWlist) {
 }
 
 $krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
-(undef, $krb5ccname) = tempfile("adjoin-krb5ccache.XXXXXX", OPEN => 0);
-(undef, $new_keytab) = tempfile("adjoin-krb5keytab.XXXXXX", OPEN => 0);
+(undef, $krb5ccname) = tempfile($cname_template, DIR => '/tmp', OPEN => 0);
+(undef, $new_keytab) = tempfile($keytab_template, DIR => '/tmp', OPEN => 0);
 
-#TODO: Past here, we will need Authen::Krb5 and family.
+print "Getting initial credentials via 'kinit'.\n";
+system("kinit $cprinc -c $krb5ccname") == 0
+    or die "system call to 'kinit' failed, can't continue. Error code: $?";
+print "Credentials cached in $krb5ccname\n";
+
+print "Looking for forest name.\n";
+find_forest( $krb5ccname, $domain_controller );
+#$ENV{KRB5CCNAME} = $krb5ccname;
 
 __END__
 
