@@ -6,6 +6,8 @@ use warnings;
 use Carp;
 use English;
 
+use sigtrap qw(die INT QUIT);
+
 use Getopt::Long;
 use Pod::Usage;
 
