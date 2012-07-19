@@ -74,6 +74,7 @@ my $upcase_nodename='';
 # Do some cleanup if we're exiting
 END {
     my $exitval = $?;
+    print "Cleaning up.\n";
     # Make sure we're only removing files in /tmp
     # This probably isn't 100%, super-duper-ultra-mega secure, but I hope it's secure enough that
     # to accidentally shoot yourself in the foot with a messed up '$krb5ccname' would be /almost/
