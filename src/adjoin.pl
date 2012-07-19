@@ -53,7 +53,6 @@ my $do_config="1";
 
 # Placeholder vars
 my $baseDN='';
-my $dc='';
 my @DClist=();
 my $dnssrv='';
 my $domain='';
@@ -432,7 +431,7 @@ sub check_dnssrv {
 GetOptions(
    'help|h|?'      => \$help,
    'man'           => \$man,
-   'dc|d=s'        => \$dc,
+   'dc|d=s'        => \$domain_controller,
    'dnssrv|D=s'    => \$dnssrv,
    'cprinc|p=s'    => \$cprinc,
    'site|s=s'      => \$site,
@@ -514,11 +513,11 @@ else {
 @DClist = get_DCs($domain);
 if (!@DClist) {
     # XXX: What if '$DomainDnsZones' is empty?
-    @DClist = ({ name => $DomainDnsZones, port => 389 });
-    $dc     = $DomainDnsZones;
+    @DClist            = ({ name => $DomainDnsZones, port => 389 });
+    $domain_controller = $DomainDnsZones;
 }
 else {
-    $dc     = $DClist[0]->{name};
+    $domain_controller = $DClist[0]->{name};
 }
 
 @KPWlist = get_KPWs($domain);
