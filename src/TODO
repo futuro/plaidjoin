@@ -1,3 +1,9 @@
+Split up file into more cohesive modules
+    adjoin.pl is too big. Something about cramming every last function into the file
+    bothers me, and I'd like them to be broken up into smaller modules based on
+    functionality (one for dns queries, one for ip munging, etc.). I don't have a specific
+    plan for how that should break down, but it is something I want.
+
 Incorporate the 'dnssrv' option into dns queries
     '--dnssrv', and it's variable '$dnssrv', aren't used in /every/ DNS query. This seems wrong,
     and should probably be fixed so that every DNS query will look at '$dnssrv'. I don't know
