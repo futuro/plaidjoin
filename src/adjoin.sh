@@ -289,6 +289,7 @@ getSite ()
 {
     typeset subnet siteDN j ldapsrv subnet_dom
 
+	# Why did we switch to using eval here?
     eval "[[ -n \"\$siteName\" ]]" && return
     for subnet in $(getSubnets)
     do
@@ -657,6 +658,7 @@ if getForestName
 then
     print "\tForest name = $forest"
 else
+	# 'fatal' will exit the program. I'm not sure why there is any other code after this...
     fatal "\tForest name not found!  There's probably a bug."
     print "\tAssume forest name == domainname"
     forest=$dom
