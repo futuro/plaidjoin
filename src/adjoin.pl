@@ -62,7 +62,7 @@ my $domain_controller='';
 my $DomainDnsZones='';
 my $forest='';
 my $ForestDnsZones='';
-my $gc='';
+my $global_catalog='';
 my @GClist=();
 my $kdc='';
 my @KDClist=();
@@ -234,7 +234,7 @@ ENDCONF
 #   Array[Hash] : A list of hashes holding the name and port for the KPASSWD servers
 #   OR
 #   ()          : The empty list, if there aren't any such servers
-sub get_KPWs {
+sub enumerate_KPWs {
     my $domain = (shift || '');
 
     return get_SRVs("_kpasswd._tcp.$domain.");
@@ -282,7 +282,7 @@ sub get_SRVs {
 #   Array[Hash]: A list of hashes holding the name and port for the KDC's
 #   OR
 #   () : The empty list
-sub get_GCs {
+sub enumerate_GCs {
     my $forest   = (shift || '');
     my $sitename = (shift || '');
 
@@ -301,7 +301,7 @@ sub get_GCs {
 #   Array[Hash]: A list of hashes holding the name and port for the KDC's
 #   OR
 #   () : The empty list
-sub get_KDCs {
+sub enumerate_KDCs {
     my $domain   = (shift || '');
     my $sitename = (shift || '');
 
@@ -312,7 +312,7 @@ sub get_KDCs {
     return get_SRVs("_kerberos._tcp".$sitename.".$domain.");
 }
 
-# TODO: get_KDCs and get_DCs are almost identical; I should figure out how to merge them.
+# TODO: enumerate_KDCs and enumerate_DCs are almost identical; I should figure out how to merge them.
 # Find the Domain Controllers (DCs)
 # Input:
 #   Str: The Domain we're searching in
@@ -321,7 +321,7 @@ sub get_KDCs {
 #   Array[Hash]: A list of hashes holding the name and port for the DC's
 #   OR
 #   () : The empty list
-sub get_DCs {
+sub enumerate_DCs {
     my $domain   = (shift || '');
     my $sitename = (shift || '');
 
@@ -558,7 +558,7 @@ $realm = uc($domain);
 $baseDN = get_base_dn($container, $domain);
 
 print "Looking for KDCs and DCs (SRV RRs)\n";
-@KDClist = get_KDCs($domain);
+@KDClist = enumerate_KDCs($domain);
 if (!@KDClist){
     # XXX: What if '$DomainDnsZones' is empty? Same for '$ForestDnsZones'
     @KDClist = ({ name => $DomainDnsZones, port => 88 });
@@ -568,7 +568,7 @@ else {
     $kdc     = $KDClist[0]->{name};
 }
 
-@DClist = get_DCs($domain);
+@DClist = enumerate_DCs($domain);
 if (!@DClist) {
     # XXX: What if '$DomainDnsZones' is empty?
     @DClist            = ({ name => $DomainDnsZones, port => 389 });
@@ -578,7 +578,7 @@ else {
     $domain_controller = $DClist[0]->{name};
 }
 
-@KPWlist = get_KPWs($domain);
+@KPWlist = enumerate_KPWs($domain);
 if (!@KPWlist) {
     # TODO: Make a function to test the @KDClist servers, using port 464, to find a server
     #       that works. I should use Net::Ping, methinks.
@@ -624,13 +624,13 @@ else {
 }
 
 print "Looking for Global Catalog servers (SRV RRs).\n";
-@GClist = getGCs($forest) unless $gc;
+@GClist = enumerate_GCs($forest) unless $global_catalog;
 if (!@GClist){
-    @GClist = ({ name => $ForestDnsZones, port => 3268 });
-    $gc     = $ForestDnsZones;
+    @GClist         = ({ name => $ForestDnsZones, port => 3268 });
+    $global_catalog = $ForestDnsZones;
 }
 else {
-    $gc     = $GClist[0]->{name};
+    $global_catalog = $GClist[0]->{name};
 }
 
 print "Looking for site name.\n";
