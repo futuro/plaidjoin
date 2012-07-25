@@ -60,7 +60,10 @@ my $dnssrv='';
 my $domain='';
 my $domain_controller='';
 my $DomainDnsZones='';
+my $forest='';
 my $ForestDnsZones='';
+my $gc='';
+my @GClist=();
 my $kdc='';
 my @KDClist=();
 my $kpasswd='';
@@ -97,12 +100,14 @@ if ($PROGRAM_NAME eq "adleave"){
 # NOTE: I'm not sure if this is ever different from the '$domain' value passed in or discovered.
 #       It would be really nice to know.
 # Input:
-#   Str: The locate of the Kerberos Ticket cache file
+#   Str: The location of the Kerberos Ticket cache file
 #   Str: The domain controller to connect to
 # Output:
 #   Str: The found forest value
+#   OR
+#   '' : Nothing was found; the empty string is returned
 sub find_forest {
-    my $ccname            = (shift || ''); # This should probably fail...
+    my $ccname            = (shift || ''); # This should probably do something when it fails...
     my $domain_controller = (shift || ''); # This too
 
     my $forest = '';
@@ -120,6 +125,7 @@ sub find_forest {
             $forest = dn2dns($line);
         }
     }
+    return $forest;
 }
 
 # Do a DNS search for the 'record' associated with 'name'
@@ -266,6 +272,25 @@ sub get_SRVs {
 
     return @SRVs;
 
+}
+
+# Find the Global Catalog servers
+# Input:
+#   Str: The forest we're searching in
+#   Str: The sitename we're using TODO:XXX: What is this variable for?
+# Output:
+#   Array[Hash]: A list of hashes holding the name and port for the KDC's
+#   OR
+#   () : The empty list
+sub get_GCs {
+    my $forest   = (shift || '');
+    my $sitename = (shift || '');
+
+    # Format '$sitename' for inclusion in the 'get_SRVs' function call, regardless
+    # of it's contents (if it's empty, it stays empty)
+    $sitename =~ s/(.+)/.$1._sites/;
+
+    return get_SRVs("_ldap._tcp".$sitename.".gc._msdcs.$forest.");
 }
 
 # Find the Key Distribution Centers (KDCs)
@@ -453,6 +478,7 @@ sub check_nss_conf {
 # However! I'm not yet completely certain what purpose $dnssrv
 # is supposed to fulfill, so once I understand that, I'll come back and fix this.
 # TODO: See above paragraph.
+#       I should look into ip_is_ipv{4,6} from Net::IP
 sub check_dnssrv {
     my $tmp_dnssrv = shift;
     ($tmp_dnssrv =~ /[0-9.:, ]+/)
@@ -587,8 +613,27 @@ system("kinit $cprinc -c $krb5ccname") == 0
 print "Credentials cached in $krb5ccname\n";
 
 print "Looking for forest name.\n";
-find_forest( $krb5ccname, $domain_controller );
-#$ENV{KRB5CCNAME} = $krb5ccname;
+$forest = find_forest( $krb5ccname, $domain_controller );
+if ($forest) {
+    print "Forest name = $forest\n";
+}
+else {
+    warn "ERROR: Forest name not found.\n";
+    warn "ERROR: Assuming the forest name is the same as the domain, \"$domain\".\n";
+    $forest = $domain;
+}
+
+print "Looking for Global Catalog servers (SRV RRs).\n";
+@GClist = getGCs($forest) unless $gc;
+if (!@GClist){
+    @GClist = ({ name => $ForestDnsZones, port => 3268 });
+    $gc     = $ForestDnsZones;
+}
+else {
+    $gc     = $GClist[0]->{name};
+}
+
+print "Looking for site name.\n";
 
 __END__
 
