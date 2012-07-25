@@ -687,9 +687,11 @@ fi
 
 if [[ ${#GCs} -eq 0 ]]
 then
+	# This doesn't actually exit...
     print "Could not find global catalogs.  Exiting"
 fi
 
+# Down the rabbit hole... {{{
 print "Looking to see if there's an existing account..."
 $verbose ldapsearch -R -T -h "$dc" $ldap_args -b "$baseDN" \
 	-s sub sAMAccountName="$netbios_nodename" dn
@@ -752,6 +754,7 @@ then
 fi
 
 object=$(mktemp -t -p /tmp adjoin-computer-object.XXXXXX)
+# The end? }}}
 
 ##
 ## Main course
