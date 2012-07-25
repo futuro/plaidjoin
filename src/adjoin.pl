@@ -74,6 +74,7 @@ my $netbios_nodename='';
 my $new_keytab='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
+my $site_name='';
 my $upcase_nodename='';
 
 # Do some cleanup if we're exiting
@@ -94,6 +95,161 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Return the length of a netmask
+# Input:
+#   Scalar: The netmask to measure
+# Output:
+#   Scalar: The length of the netmask
+#   OR
+#   32    : The maximum length of a netmask (indicates single host subnet)
+sub netmask_to_length {
+    my $mask = (shift or 0);
+
+    my $length = 32;
+
+    while ( ($mask % 2) == 0 ){
+        $mask>>=1;
+        $length--;
+    }
+
+    return $length;
+}
+
+# Translate a number to a dotted quad
+# XXX: Is there a module for this?
+# Input:
+#   Str      : The number to convert
+# Output:
+#   Str      : The converted number
+#   OR
+#   0.0.0.0  : Nothing or 0 was passed in
+sub num_to_dot_quad {
+    my $num = (shift || 0);
+    my ( $first, $second, $third, $fourth );
+
+    $first  = $num >> 24;
+    $second = ($num >> 16) & 0xff;
+    $third  = ($num >> 8) & 0xff;
+    $fourth = $num & 0xff;
+
+    return "$first.$second.$third.$fourth";
+}
+
+# Translate a dotted quad to a number
+# XXX: Is there a module for this?
+# Input:
+#   Str: The dotted quad to convert
+# Output:
+#   Str: The converted quad
+#   OR
+#   0  : Nothing was passed in, so nothing was converted
+sub dot_quad_to_num {
+    my $quad = shift;
+
+    my $num = 0;
+
+    if ($quad =~ /([0-9]+\.?){4}/) {
+        my ( $first, $second, $third, $fourth ) = split(/\./, $quad);
+
+        $num = ( $first << 24 | $second << 16 | $third << 8 | $fourth );
+    }
+
+    return $num;
+}
+
+# Locate all subnets associated with every device on the machine
+# Input:
+#   N/A
+# Ouput:
+#   Array: The found subnets
+#   OR
+#   ()   : No subnets were found
+sub enumerate_subnets {
+    my @ifconfig = qx(ifconfig -a|grep inet);
+
+    my ($addr, $mask);
+    my @subnets = ();
+
+    my $regexp = qr/.*inet (?:addr:)?([0-9.]+).*(?:Mask:|netmask )([0-9.]+)/o;
+
+    LINE:
+    for my $line (@ifconfig) {
+        $line =~ /$regexp/;
+        $addr = dot_quad_to_num($1||0);
+        $mask = dot_quad_to_num($2||0);
+
+        next LINE if (!$addr or !$mask or (($addr & 0xff000000) == 0x7f000000));
+
+        push @subnets, num_to_dot_quad($addr & $mask)."/".netmask_to_length($mask);
+    }
+
+    return @subnets;
+}
+
+# Find the site name
+# This will look up the site name for one of the subnets associated with the hosts NIC's
+# XXX XXX: As far as I've been able to find out, we don't have subnet DN's or 'siteObject's
+#          or 'siteName's, so I have no way of testing this code. I'm translating
+#          this as best I can, but I make no promises on its veracity
+# Input:
+#   Str: The location of the Kerberos Ticket cache file
+#   Str: The domain controller to connect to
+# Output:
+#   Str: The found site value
+#   OR
+#   '' : Nothing was found; the empty string is returned
+sub find_site {
+    my $ccname            = (shift || ''); # This should probably do something when it fails...
+    my $domain_controller = (shift || ''); # This too
+
+    my $site_name      = '';
+    my $subnet_domain = '';
+    my $ldapsrv       = '';
+
+    my @results      = ();
+    my @more_results = ();
+    my $ldap_options = '-Q -Y gssapi -b "" -s sub';
+    my $more_ldap_opts = '';
+
+    $ccname = "KRB5CCNAME=$ccname";
+
+    my @subnets = enumerate_subnets();
+    SUBNET:
+    for my $subnet (@subnets) {
+
+        print "\tLooking for subnet object in the global catalog.\n";
+        @results = qx($ccname ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
+
+        LINE:
+        for my $line (@results) {
+
+            # This fixes $line, but if it doesn't match (i.e. we have a line
+            # we don't want to use) it will skip to the next line
+            next LINE unless ($line =~ s/^dn (.+)/$1/);
+
+            print "\tLooking for subnet objects in its domain.\n";
+            $subnet_domain = dn2dns($line);
+            $ldapsrv = canon_resolve("DomainDnsZones.$subnet_domain");
+
+            $more_ldap_opts = "-Q -Y gssapi -b \"$line\" -s base \"\" siteObject";
+            @more_results = qx($ccname ldapsearch -h $ldapsrv $ldap_options);
+
+            SITEDN:
+            for my $line (@more_results) {
+
+                # This fixes $line, but if it doesn't match (i.e. we have a line
+                # we don't want to use) it will skip to the next line
+                next SITEDN unless ($line =~ s/^siteObject CN=(.+),.*/$1/);
+
+                # Found it; store it and exit the loops
+                $site_name = $line;
+                last SUBNET;
+            }
+        }
+    }
+    return $site_name;
 }
 
 # Find the forest name
@@ -634,6 +790,63 @@ else {
 }
 
 print "Looking for site name.\n";
+$site_name = find_site( $krb5ccname, $domain_controller );
+
+if (!$site_name) {
+    print "\tSite name not found. Local DCs/GCs will not be discovered.\n";
+}
+else {
+    print "Looking for local KDCs, DCs and global catalog servers (SRV RRs).\n";
+    # TODO: This is duplicated, almost entirely, from above. That should be fixed some how
+    #       (while loop?)
+    @KDClist = enumerate_KDCs($domain, $site_name);
+    if (!@KDClist){
+        # XXX: What if '$DomainDnsZones' is empty? Same for '$ForestDnsZones'
+        @KDClist = ({ name => $DomainDnsZones, port => 88 });
+        $kdc     = $ForestDnsZones;
+    }
+    else {
+        $kdc     = $KDClist[0]->{name};
+    }
+
+    @DClist = enumerate_DCs($domain, $site_name);
+    if (!@DClist) {
+        # XXX: What if '$DomainDnsZones' is empty?
+        @DClist            = ({ name => $DomainDnsZones, port => 389 });
+        $domain_controller = $DomainDnsZones;
+    }
+    else {
+        $domain_controller = $DClist[0]->{name};
+    }
+
+    @GClist = enumerate_GCs($forest) unless $global_catalog;
+    if (!@GClist){
+        @GClist         = ({ name => $ForestDnsZones, port => 3268 });
+        $global_catalog = $ForestDnsZones;
+    }
+    else {
+        $global_catalog = $GClist[0]->{name};
+    }
+
+    # TODO: These loops could be in a function
+    print "\nLocal KDCs\n----";
+    for my $pair (@KDClist) {
+        print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+    }
+    print "\nLocal DCs\n----";
+    for my $pair (@DClist) {
+        print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+    }
+    print "\nLocal GCs\n----";
+    for my $pair (@GClist) {
+        print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
+    }
+}
+
+if (!@GClist) {
+    warn "Couldn't find any global catalogs. Exiting.\n";
+    exit 1;
+}
 
 __END__
 
