@@ -27,6 +27,7 @@ my $keytab_template="adjoin-krb5keytab.XXXXXX";
 my $ldap_args="-o authzid= -o mech=gssapi";
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
+my $object_template="adjoin-computer-object.XXXXXX";
 my $port=3268;
 my $userAccountControlBASE=4096;
 #my osvers=$(uname -r); # I don't think this will be necessary in the port
@@ -72,6 +73,7 @@ my $krb5ccname='';
 my $krb5conf='';
 my $netbios_nodename='';
 my $new_keytab='';
+my $object='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
 my $site_name='';
@@ -95,6 +97,117 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Do some OpenSolaris configuration stuff
+# XXX XXX: I don't have access to an OpenSolaris box, so I make no assurances that this
+#          code works, or does anything, or doesn't do every possible bad thing.
+#          Use at your own risk.
+# Input:
+#   N/A
+# Output:
+#   1: Success (always)
+sub doIDMAPconfig {
+    my $dryrun = (shift or 0);
+    my $leave  = (shift or 0);
+
+    system("svcs -l svc:/system/idmap >/dev/null 2>/dev/null");
+    # SNV/OpenSolaris
+    if ($? == 0) {
+        if ($leave) {
+            system("svcadm disable -s svc:/system/idmap") unless $dryrun;
+        }
+        else {
+            system("svcadm disable -ts svc:/system/idmap") unless $dryrun;
+            system("svcadm enable -t svc:/system/idmap") unless $dryrun;
+        }
+    }
+
+    return 1;
+}
+
+# Deduce whether there is an existing machine account
+# NOTE: I created this function to help try and control some of the wild growth in adjoin.sh.
+#       This function is un good, and I'm not 100% certain how I want to ultimately deal
+#       with this code. So, I did the rough equivalent of sweeping it under the rug. It's still
+#       a problem, and I've named it so it should stick out.
+# Input:
+#   I dunno lol.
+# Output
+#   ????????
+sub sleuth_machine_bad_times {
+    my $baseDN            = (shift or '');
+    my $netbios_nodename  = (shift or '');
+    my $ccname            = (shift or '');
+    my $domain_controller = (shift or '');
+    my $ignore_existing   = (shift or 0);
+    my $modify_existing   = (shift or 0);
+    my $extra_force       = (shift or 0);
+    my $leave             = (shift or 0);
+    my $verbose           = (shift or 0);
+
+    $ccname = "KRB5CCNAME=$ccname";
+
+    my $distinct_name = '';
+
+    my $ldap_options = '';
+    my @results = ();
+
+    if (!$dryrun) {
+        print "Checking for an existing account.\n";
+        $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub sAMAccountName="$netbios_nodename" dn);
+        @results = qx(ldapsearch -h $domain_controller $ldap_options);
+
+        for my $answer (@results) {
+            next unless ($answer =~ s/^dn: (.+)/$1/);
+
+            $distinct_name = $1;
+            last;
+        }
+    }
+
+    if (!$distinct_name) {
+        $ignore_existing = 0;
+        $modify_existing = 0;
+    }
+
+    # If $ignore_existing is false and $modify_existing is false and $distinct_name exists
+    if ( (!$ignore_existing eq !0) and (!$modify_existing eq !0) and $distinct_name ) {
+        print "Inspecting machine account for other objects.\n";
+
+        $ldap_options = qq(-Q -Y gssapi -b "$distinct_name" -s sub "" dn);
+        @results = qx($ccname ldapsearch -h $domain_controller $ldap_options);
+        for my $answer (@results) {
+            next unless (($answer =~ s/^dn: (.+)/$1/) and ($distinct_name ne $answer));
+
+            $answer =~ /$distinct_name(.*)/;
+            my $sub_dn = $1;
+
+            if ($extra_force) {
+                print "Deleting the following object: $sub_dn\n";
+                system(qq($ccname ldapdelete -h "$domain_controller" $ldap_options "$answer"));
+            }
+            else {
+                print "The following object must be deleted (use -f -f, -r or -i): $sub_dn\n";
+            }
+        }
+
+        if ($force or $leave) {
+            print "Deleting existing machine account.\n";
+            system(qq($ccname ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
+        }
+        elsif (!$modify_existing or !$ignore_existing) {
+            warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
+            exit 1;
+        }
+    }
+
+    if ($leave) {
+        doIDMAPconfig(); # This is specifically for SNV/OpenSolaris
+        my $base = ($0 =~ m|\./(.*)+|);
+        print "$base: Done\n";
+        exit 0;
+    }
 }
 
 # Return the length of a netmask
@@ -848,6 +961,10 @@ if (!@GClist) {
     exit 1;
 }
 
+# XXX bad times below
+sleuth_machine_bad_times( $baseDN, $netbios_nodename, $krb5ccname,
+                          $domain_controller, $ignore_existing, $modify_existing,
+                          $extra_force, $leave, $verbose );
 __END__
 
 =head1 NAME
