@@ -383,9 +383,7 @@ sub find_forest {
     my @results = ();
 
     my $ldap_options = '-Q -Y gssapi -b "" -s base "" schemaNamingContext';
-
     $ccname = "KRB5CCNAME=$ccname";
-
     @results = qx($ccname ldapsearch -h $domain_controller $ldap_options);
 
     for my $line (@results) {
