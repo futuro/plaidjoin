@@ -702,6 +702,7 @@ then
     then
 	:
     else
+	# Why is this fatal, yet other ldapsearch'es aren't?
 	fatal "ldapsearch failed -- something's wrong"
     fi
     ldapsearch -R -T -h "$dc" $ldap_args -b "$baseDN" -s sub \
