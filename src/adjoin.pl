@@ -24,7 +24,7 @@ my $container="CN=Computers";
 my $cprinc="Administrator";
 my $fqdn=hostfqdn();
 my $keytab_template="adjoin-krb5keytab.XXXXXX";
-my $ldap_args="-o authzid= -o mech=gssapi";
+my $ldap_args="-o authzid= -o mech=gssapi"; # TODO: Verify these are actually correct
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
 my $object_template="adjoin-computer-object.XXXXXX";
@@ -859,6 +859,7 @@ else {
     $kpasswd = $KPWlist[0]->{name};
 }
 
+# TODO: These loops could be in a function
 print "\nKDCs\n----";
 for my $pair (@KDClist) {
     print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
