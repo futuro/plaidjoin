@@ -99,6 +99,25 @@ if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
 }
 
+# Generate a temp file name (e.g. "/tmp/foo.bar.1241"). Don't open it.
+# Defaults:
+#   Str: the template has a defualt
+#   Str: The directory the tempfile is made in has a default
+# Input:
+#   Str: The template to use
+# Ouput:
+#   Str: The path to the temp file
+sub generate_tmpfile {
+    my $template = (shift or 'default-adjoin-tmpfile.XXXXXX');
+    my $dir      = (shift or '/tmp');
+
+    my $filename = '';
+
+    (undef, $filename) = tempfile($template, DIR => $dir, OPEN => 0);
+
+    return $filename;
+}
+
 # Do some OpenSolaris configuration stuff
 # XXX XXX: I don't have access to an OpenSolaris box, so I make no assurances that this
 #          code works, or does anything, or doesn't do every possible bad thing.
@@ -872,8 +891,8 @@ for my $pair (@KPWlist) {
 }
 
 $krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
-(undef, $krb5ccname) = tempfile($cname_template, DIR => '/tmp', OPEN => 0);
-(undef, $new_keytab) = tempfile($keytab_template, DIR => '/tmp', OPEN => 0);
+$krb5ccname = generate_tmpfile($cname_template);
+$new_keytab = generate_tmpfile($keytab_template);
 
 print "Getting initial credentials via 'kinit'.\n";
 system("kinit $cprinc -c $krb5ccname") == 0
@@ -964,6 +983,8 @@ if (!@GClist) {
 sleuth_machine_bad_times( $baseDN, $netbios_nodename, $krb5ccname,
                           $domain_controller, $ignore_existing, $modify_existing,
                           $extra_force, $leave, $verbose );
+
+$object = generate_tmpfile($object_template);
 __END__
 
 =head1 NAME
