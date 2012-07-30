@@ -73,7 +73,7 @@ my $krb5ccname='';
 my $krb5conf='';
 my $netbios_nodename='';
 my $new_keytab='';
-my $object='';
+my $object_file='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
 my $site_name='';
@@ -97,6 +97,84 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Creates and adds the ldap machine account
+# Input:
+#   Str : The ldapadd object file name
+#   Str : The uppercased node name
+#   Str : The base distinct name
+#   Str : The netbios nodename
+#   Str : The realm
+#   Str : The file name for the kerberos ticket cache
+#   Num : The UAC Base number
+#   Bool: Whether to modify existing accounts
+#   Bool: Whether to ignore existing accounts
+# Output:
+#   N/A
+sub create_ldap_account {
+    my $object_file            = (shift or generate_tmpfile("ldap_obj.XXXXXX"));
+    my $upcase_nodename        = (shift or '');
+    my $baseDN                 = (shift or '');
+    my $netbios_nodename       = (shift or '');
+    my $realm                  = (shift or '');
+    my $ccname                 = (shift or '');
+    my $userAccountControlBASE = (shift or 0);
+    my $domain_controller      = (shift or '');
+    my $modify_existing        = (shift or '');
+    my $ignore_existing        = (shift or '');
+
+    my $fqdn = hostfqdn();
+    my $userAccountControl = ($userAccountControlBASE + 32 + 2);
+    my $userPrincipalName = $fqdn."@".$realm;
+
+    my $ldap_options = qq(-Q -Y gssapi);
+    my $object;
+
+    $ccname = "KRB5CCNAME=$ccname" unless !$ccname;
+
+    if ($modify_existing) {
+        $object = <<ENDOBJECT;
+dn: CN=$upcase_nodename,$baseDN
+changetype: modify
+replace: servicePrincipalName
+servicePrincipalName: host/$fqdn
+-
+replace: userAccountControl
+userAccountControl: $userAccountControl
+-
+replace: dNSHostname
+dNSHostname: $fqdn
+ENDOBJECT
+
+        open FH, "<$object_file" or die "Couldn't open $object_file: $!";
+        print FH $object;
+        close FH;
+
+        print "A machine account already exists; resetting it.\n";
+        system(qq($ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+            or die "Could not add the new object to AD: $!";
+    }
+    elsif ($ignore_existing) {
+        print "A machine account exists; re-using it.\n";
+    }
+    else {
+        $object = <<ENDOBJECT;
+dn: CN=$upcase_nodename,$baseDN
+objectClass: computer
+cn: $upcase_nodename
+sAMAccountName: $netbios_nodename
+userPrincipalName: host/$userPrincipalName
+servicePrincipalName: host/$fqdn
+userAccountControl: $userAccountControl
+dNSHostname: $fqdn
+ENDOBJECT
+
+        print "Creating the machine account in AD via LDAP.\n";
+
+        system(qq($ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+            or die "Could not add the new object to AD: $!";
+    }
 }
 
 # Generate a temp file name (e.g. "/tmp/foo.bar.1241"). Don't open it.
@@ -984,7 +1062,23 @@ sleuth_machine_bad_times( $baseDN, $netbios_nodename, $krb5ccname,
                           $domain_controller, $ignore_existing, $modify_existing,
                           $extra_force, $leave, $verbose );
 
-$object = generate_tmpfile($object_template);
+##
+## Main course (apparently)
+##
+#
+#  The key here are the userPrincipalName, servicePrincipalName and
+#  userAccountControl attributes.  Note that servicePrincipalName must
+#  not have the @REALM part while userPrincipalName must have it.  And
+#  userAccountControl MUST NOT have the DONT_REQ_PREAUTH flag (unless
+#  krb5.conf is going to be written so we always do pre-auth) -- no
+#  pre-auth, no LDAP lookups.
+#
+$object_file = generate_tmpfile($object_template);
+
+create_ldap_account( $object_file, $upcase_nodename, $baseDN,
+                     $netbios_nodename, $realm, $krb5ccname, $userAccountControlBASE,
+                     $domain_controller, $modify_existing, $ignore_existing );
+
 __END__
 
 =head1 NAME
