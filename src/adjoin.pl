@@ -11,6 +11,8 @@ use sigtrap qw(die INT QUIT);
 use Getopt::Long;
 use Pod::Usage;
 
+use String::MkPasswd qw(mkpasswd);
+
 use Net::Domain qw(hostname hostfqdn hostdomain);
 use Net::DNS;
 
@@ -25,9 +27,14 @@ my $cprinc="Administrator";
 my $fqdn=hostfqdn();
 my $keytab_template="adjoin-krb5keytab.XXXXXX";
 my $ldap_args="-o authzid= -o mech=gssapi"; # TODO: Verify these are actually correct
+my $minlower = 15;
+my $minnum = 15;
+my $minspecial = 15;
+my $minupper = 15;
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
 my $object_template="adjoin-computer-object.XXXXXX";
+my $passlen = 80;
 my $port=3268;
 my $userAccountControlBASE=4096;
 #my osvers=$(uname -r); # I don't think this will be necessary in the port
@@ -61,6 +68,7 @@ my $dnssrv='';
 my $domain='';
 my $domain_controller='';
 my $DomainDnsZones='';
+my $escaped_machine_passwd='';
 my $forest='';
 my $ForestDnsZones='';
 my $global_catalog='';
@@ -71,6 +79,7 @@ my $kpasswd='';
 my @KPWlist=();
 my $krb5ccname='';
 my $krb5conf='';
+my $machine_passwd='';
 my $netbios_nodename='';
 my $new_keytab='';
 my $object_file='';
@@ -97,6 +106,73 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Creates and sets the ldap machine password
+# NOTE: If all of the minimum options ($minnum et.al.) add up to more than
+#       $passlen, $passlen will be divided by the number of options, converted to
+#       an int, and then the minimums will be set to that number.
+# Input:
+#   Str : The file name for the kerberos ticket cache
+#   Str : The realm we're associating with
+#   Bool: Whether this is a dryrun or not
+#   Num : The length of the password to use
+#   Num : The minimum number of number characters to use
+#   Num : The minimum number of lower case characters to use
+#   Num : The minimum number of upper case characters to use
+#   Num : The minimum number of special characters to use
+# Output:
+#   Str : The new machine password
+sub generate_and_set_passwd {
+    my $ccname     = (shift or '');
+    my $realm      = (shift or '');
+    my $dryrun     = (shift or '');
+    my $passlen    = (shift or 80);
+    my $minnum     = (shift or 15);
+    my $minlower   = (shift or 15);
+    my $minupper   = (shift or 15);
+    my $minspecial = (shift or 15);
+
+    my $fqdn = hostfqdn();
+
+    my $userPrincipalName = $fqdn."@".$realm;
+
+    $ccname = "KRB5CCNAME=$ccname" unless !$ccname;
+
+    my $escaped_machine_passwd;
+    my $machine_passwd;
+
+    # If the specified minimums are greater than the password length, divide the password
+    # length by four (the number of options), make it an int (which truncates the number),
+    # and set all of the minimums to that.
+    if (($minlower + $minnum + $minupper + $minspecial) > $passlen) {
+        my $diff = int($passlen/4);
+        $minlower   = $diff;
+        $minnum     = $diff;
+        $minupper   = $diff;
+        $minspecial = $diff;
+    }
+
+    # Generate a random password with a length of 80 and at least 15 numbers, lower case letters,
+    # upper case letters and special characters. The other 20 characters are filled randomly.
+    $machine_passwd = mkpasswd(
+        -length     => $passlen,
+        -minnum     => $minnum,
+        -minlower   => $minlower,
+        -minupper   => $minupper,
+        -minspecial => $minspecial );
+    # XXX: The potential issue with this method is that the machine password will
+    #      show up in the ps list, atleast for as long as it takes to set the password.
+    #      A possible alternative would be to open ksetpass with a pipe, then write to the pipe.
+    #      TODO: Something like what I just described, or maybe implement ksetpass in perl so
+    #            everything is internal.
+    if (!$dryrun) {
+        ($escaped_machine_passwd = $machine_passwd) =~ s/([[:punct:]])/\\$1/g;
+        system(qq(echo -n '$escaped_machine_passwd' |$ccname ksetpass host/$userPrincipalName)) == 0
+            or die "ERROR: Could not set the machine password; dying: ";
+    }
+
+    return $machine_passwd;
 }
 
 # Creates and adds the ldap machine account
@@ -1078,6 +1154,8 @@ $object_file = generate_tmpfile($object_template);
 create_ldap_account( $object_file, $upcase_nodename, $baseDN,
                      $netbios_nodename, $realm, $krb5ccname, $userAccountControlBASE,
                      $domain_controller, $modify_existing, $ignore_existing );
+
+$machine_passwd = generate_and_set_passwd( $krb5ccname, $realm, $dryrun, $passlen, $minnum, $minlower, $minupper, $minspecial );
 
 __END__
 
