@@ -124,7 +124,7 @@ if ($PROGRAM_NAME eq "adleave"){
 # Output:
 #   Str : The new machine password
 sub generate_and_set_passwd {
-    my $ccname     = (shift or '');
+    my $krb5ccname = (shift or '');
     my $realm      = (shift or '');
     my $dryrun     = (shift or '');
     my $passlen    = (shift or 80);
@@ -137,7 +137,7 @@ sub generate_and_set_passwd {
 
     my $userPrincipalName = $fqdn."@".$realm;
 
-    $ccname = "KRB5CCNAME=$ccname" unless !$ccname;
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     my $escaped_machine_passwd;
     my $machine_passwd;
@@ -168,7 +168,7 @@ sub generate_and_set_passwd {
     #            everything is internal.
     if (!$dryrun) {
         ($escaped_machine_passwd = $machine_passwd) =~ s/([[:punct:]])/\\$1/g;
-        system(qq(echo -n '$escaped_machine_passwd' |$ccname ksetpass host/$userPrincipalName)) == 0
+        system(qq(echo -n '$escaped_machine_passwd' |$krb5ccname ksetpass host/$userPrincipalName)) == 0
             or die "ERROR: Could not set the machine password; dying: ";
     }
 
@@ -194,7 +194,7 @@ sub create_ldap_account {
     my $baseDN                 = (shift or '');
     my $netbios_nodename       = (shift or '');
     my $realm                  = (shift or '');
-    my $ccname                 = (shift or '');
+    my $krb5ccname             = (shift or '');
     my $userAccountControlBASE = (shift or 0);
     my $domain_controller      = (shift or '');
     my $modify_existing        = (shift or '');
@@ -207,7 +207,7 @@ sub create_ldap_account {
     my $ldap_options = qq(-Q -Y gssapi);
     my $object;
 
-    $ccname = "KRB5CCNAME=$ccname" unless !$ccname;
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     if ($modify_existing) {
         $object = <<ENDOBJECT;
@@ -228,7 +228,7 @@ ENDOBJECT
         close FH;
 
         print "A machine account already exists; resetting it.\n";
-        system(qq($ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+        system(qq($krb5ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
             or die "Could not add the new object to AD: $!";
     }
     elsif ($ignore_existing) {
@@ -248,7 +248,7 @@ ENDOBJECT
 
         print "Creating the machine account in AD via LDAP.\n";
 
-        system(qq($ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+        system(qq($krb5ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
             or die "Could not add the new object to AD: $!";
     }
 }
@@ -311,7 +311,7 @@ sub doIDMAPconfig {
 sub sleuth_machine_bad_times {
     my $baseDN            = (shift or '');
     my $netbios_nodename  = (shift or '');
-    my $ccname            = (shift or '');
+    my $krb5ccname        = (shift or '');
     my $domain_controller = (shift or '');
     my $ignore_existing   = (shift or 0);
     my $modify_existing   = (shift or 0);
@@ -319,7 +319,7 @@ sub sleuth_machine_bad_times {
     my $leave             = (shift or 0);
     my $verbose           = (shift or 0);
 
-    $ccname = "KRB5CCNAME=$ccname";
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     my $distinct_name = '';
 
@@ -349,7 +349,7 @@ sub sleuth_machine_bad_times {
         print "Inspecting machine account for other objects.\n";
 
         $ldap_options = qq(-Q -Y gssapi -b "$distinct_name" -s sub "" dn);
-        @results = qx($ccname ldapsearch -h $domain_controller $ldap_options);
+        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
         for my $answer (@results) {
             next unless (($answer =~ s/^dn: (.+)/$1/) and ($distinct_name ne $answer));
 
@@ -358,7 +358,7 @@ sub sleuth_machine_bad_times {
 
             if ($extra_force) {
                 print "Deleting the following object: $sub_dn\n";
-                system(qq($ccname ldapdelete -h "$domain_controller" $ldap_options "$answer"));
+                system(qq($krb5ccname ldapdelete -h "$domain_controller" $ldap_options "$answer"));
             }
             else {
                 print "The following object must be deleted (use -f -f, -r or -i): $sub_dn\n";
@@ -367,7 +367,7 @@ sub sleuth_machine_bad_times {
 
         if ($force or $leave) {
             print "Deleting existing machine account.\n";
-            system(qq($ccname ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
+            system(qq($krb5ccname ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
         }
         elsif (!$modify_existing or !$ignore_existing) {
             warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
@@ -487,7 +487,7 @@ sub enumerate_subnets {
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_site {
-    my $ccname            = (shift || ''); # This should probably do something when it fails...
+    my $krb5ccname        = (shift || ''); # This should probably do something when it fails...
     my $domain_controller = (shift || ''); # This too
 
     my $site_name      = '';
@@ -499,14 +499,14 @@ sub find_site {
     my $ldap_options = '-Q -Y gssapi -b "" -s sub';
     my $more_ldap_opts = '';
 
-    $ccname = "KRB5CCNAME=$ccname";
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     my @subnets = enumerate_subnets();
     SUBNET:
     for my $subnet (@subnets) {
 
         print "\tLooking for subnet object in the global catalog.\n";
-        @results = qx($ccname ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
+        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
 
         LINE:
         for my $line (@results) {
@@ -520,7 +520,7 @@ sub find_site {
             $ldapsrv = canon_resolve("DomainDnsZones.$subnet_domain");
 
             $more_ldap_opts = "-Q -Y gssapi -b \"$line\" -s base \"\" siteObject";
-            @more_results = qx($ccname ldapsearch -h $ldapsrv $ldap_options);
+            @more_results = qx($krb5ccname ldapsearch -h $ldapsrv $ldap_options);
 
             SITEDN:
             for my $line (@more_results) {
@@ -549,15 +549,15 @@ sub find_site {
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_forest {
-    my $ccname            = (shift || ''); # This should probably do something when it fails...
+    my $krb5ccname        = (shift || ''); # This should probably do something when it fails...
     my $domain_controller = (shift || ''); # This too
 
     my $forest = '';
     my @results = ();
 
     my $ldap_options = '-Q -Y gssapi -b "" -s base "" schemaNamingContext';
-    $ccname = "KRB5CCNAME=$ccname";
-    @results = qx($ccname ldapsearch -h $domain_controller $ldap_options);
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
+    @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
 
     for my $line (@results) {
         if ($line =~ /^schema/) {
