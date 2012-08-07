@@ -1,3 +1,9 @@
+Combine all of the LDAP system calls into a better module
+    Maybe have a function that sets up the ldap options based on the OS...
+    Maybe have a function that does the call and returns the results, and what you pass it
+    is the string of the stuff you care about? However I do it, I'm getting really tired
+    of writing the same ldap code over and over again!
+
 Split up file into more cohesive modules
     adjoin.pl is too big. Something about cramming every last function into the file
     bothers me, and I'd like them to be broken up into smaller modules based on
@@ -19,4 +25,4 @@ Decide what things should count as error states, and how to handle them.
     There isn't a lot of thought put into what to do when various things fail, and that
     definitely needs to be taken into account.
 
-vim: tw=90
+vim: tw=90 et ts=4 sw=4
