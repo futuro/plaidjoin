@@ -11,6 +11,8 @@ Have OS specific sub-dirs for the modules
     require "$^O/test.pm";
     'test'->import("test");
 
+Look into kclient on solaris. I'm not certain how well it plays with AD though...
+
 Combine all of the LDAP system calls into a better module
     Maybe have a function that sets up the ldap options based on the OS...
     Maybe have a function that does the call and returns the results, and what you pass it
