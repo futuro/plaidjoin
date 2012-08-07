@@ -28,8 +28,10 @@ my $option_results;
 my $cname_template="adjoin-krb5ccache.XXXXXX";
 my $container="CN=Computers";
 my $cprinc="Administrator";
+my $encrypt_template="adjoin-encryption-object.XXXXXX";
 my $fqdn=hostfqdn();
 my $keytab_template="adjoin-krb5keytab.XXXXXX";
+my $kvno=1;
 my $ldap_args="-o authzid= -o mech=gssapi"; # TODO: Verify these are actually correct
 my $minlower = 15;
 my $minnum = 15;
@@ -62,7 +64,7 @@ my $join="1";
 # There will be a "dryrun" type function to enforce the dryrun option. As such, there will be just
 # 'dryrun', and no 'notdryrun'.
 #my $notdryrun="1"; # This is a bool that represents whether we are doing a dry run. See dryrun
-my $do_config="1";
+my $setup_config="1";
 #my $verbose_cat="1";
 
 # Placeholder vars
@@ -72,6 +74,7 @@ my $dnssrv='';
 my $domain='';
 my $domain_controller='';
 my $DomainDnsZones='';
+my @enc_types=();
 my $escaped_machine_passwd='';
 my $forest='';
 my $ForestDnsZones='';
