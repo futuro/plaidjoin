@@ -13,9 +13,6 @@ Dependencies:
     Solaris Specific:
         encrypt, svcs, svcadm
 
-NOTE:
-    This is still in the alpha stage. Use at your own risk.
-
 Acknowledgements:
     This would have been vastly more difficult without the tangential
     assistance of Nico Williams and Baban Kenkre, through their work on
