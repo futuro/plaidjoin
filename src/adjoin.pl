@@ -79,13 +79,13 @@ my $global_catalog='';
 my @GClist=();
 my $kdc='';
 my @KDClist=();
+my $keytab_file='';
 my $kpasswd='';
 my @KPWlist=();
 my $krb5ccname='';
 my $krb5conf='';
 my $machine_passwd='';
 my $netbios_nodename='';
-my $new_keytab='';
 my $object_file='';
 my $realm='';
 my $site=''; # This variable is never used in adjoin.sh
@@ -1455,7 +1455,7 @@ for my $pair (@KPWlist) {
 
 $krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
 $krb5ccname = generate_tmpfile($cname_template);
-$new_keytab = generate_tmpfile($keytab_template);
+$keytab_file = generate_tmpfile($keytab_template);
 
 print "Getting initial credentials via 'kinit'.\n";
 system("kinit $cprinc -c $krb5ccname") == 0
@@ -1564,7 +1564,8 @@ create_ldap_account( $object_file, $upcase_nodename, $baseDN,
                      $netbios_nodename, $realm, $krb5ccname, $userAccountControlBASE,
                      $domain_controller, $modify_existing, $ignore_existing );
 
-$machine_passwd = generate_and_set_passwd( $krb5ccname, $realm, $dryrun, $passlen, $minnum, $minlower, $minupper, $minspecial );
+$machine_passwd = generate_and_set_passwd( $krb5ccname, $realm, $dryrun,
+                                           $passlen, $minnum, $minlower, $minupper, $minspecial );
 
 __END__
 
