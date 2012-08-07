@@ -1,0 +1,23 @@
+Dependencies:
+    ksetpass                       : From kadmin-remctl project
+    ldap{add,search,delete,modify} : From ldap-utils
+    kinit/kdestroy/ktutil          : From krb5-user
+    rm                             : Standard rm command
+    ifconfig                       : net-tools (on linux, not sure about elsewhere
+
+    Linux Specific:
+        lsmod
+
+    Solaris Specific:
+        encrypt, svcs, svcadm
+
+NOTE:
+    This is still in the alpha stage. Use at your own risk.
+
+Acknowledgements:
+    This would have been vastly more difficult without the tangential
+    assistance of Nico Williams and Baban Kenkre, through their work on
+    adjoin.sh.
+
+
+vim: et ts=4 sw=4 tw=75

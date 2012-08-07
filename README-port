@@ -1,7 +1,0 @@
-Dependencies:
-    ksetpass                : From kadmin-remctl project
-    ldap{add,search,delete} : From ldap-utils
-    kinit/kdestroy          : From krb5-user
-
-NOTE:
-    Look into kclient on solaris. I'm not certain how well it plays with AD though...
