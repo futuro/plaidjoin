@@ -492,6 +492,31 @@ ENDOBJECT
     return @enc_types;
 }
 
+# Deduce the new principal's key version number
+# TODO: Fill out this header format
+# Input:
+#   St
+sub deduce_kvno {
+    my $domain_controller = (shift or '');
+    my $baseDN            = (shift or '');
+    my $upcase_nodename   = (shift or '');
+    my $krb5ccname        = (shift or '');
+
+    my $kvno = 1;
+
+    my $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub "cn=$upcase_nodename" msDS-KeyVersionNumber);
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
+    my @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
+
+    foreach my $line (@results) {
+        next unless (($kvno = $line) =~ s/^msDS-KeyVersionNumber: (.+)/$1/);
+
+        last;
+    }
+
+    return $kvno;
+}
+
 # Creates and sets the ldap machine password
 # NOTE: If all of the minimum options ($minnum et.al.) add up to more than
 #       $passlen, $passlen will be divided by the number of options, converted to
