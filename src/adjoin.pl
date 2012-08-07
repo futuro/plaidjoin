@@ -17,6 +17,10 @@ use Net::Domain qw(hostname hostfqdn hostdomain);
 use Net::DNS;
 
 use File::Temp qw(tempfile);
+use File::Copy qw(cp);
+
+# TODO: This is used in kt_write. Maybe I should put it in there...
+use Expect ();
 
 my $option_results;
 
@@ -106,6 +110,186 @@ END {
 
 if ($PROGRAM_NAME eq "adleave"){
     $leave=1;
+}
+
+# Move over the configuration and keytab files
+# Input:
+#   Str  : Location of the config files
+#   Str  : Location of the keytab file
+#   Bool : Whether we're doing a dryrun (default: False)
+#   Bool : Whether we're being verbose (default: False)
+# Output:
+#   N/A
+sub setup_krb_files {
+    my $krb5_conf    = (shift or '');
+    my $keytab       = (shift or '');
+    my $dryrun       = (shift or 0);
+    my $verbose      = (shift or 0);
+
+    # If this is a dryrun, just return
+    if ($dryrun) {
+        return;
+    }
+
+    my $default_conf   = "/etc/krb5.conf";
+    my $default_keytab = "/etc/krb5.keytab";
+
+    my $conf_mode   = 0644;
+    my $keytab_mode = 0600;
+
+    if (-e "$default_conf") {
+        cp("$default_conf", "$default_conf-pre-adjoin");
+    }
+
+    if (-e "$default_keytab") {
+        cp("$default_keytab", "$default_keytab-pre-adjoin");
+    }
+
+    if ( cp($krb5_conf, $default_conf) ) {
+        chmod $conf_mode, $default_conf;
+    }
+    else {
+        warn "Unable to copy $krb5_conf to $default_conf.";
+    }
+    if ( cp($keytab, $default_keytab) ) {
+        chmod $keytab_mode, $default_keytab;
+    }
+    else {
+        warn "Unable to copy $keytab to $default_keytab.";
+    }
+}
+
+# Create a keytab file for the machine account
+# Input:
+#   Str        : The password for the machine account
+#   Str        : the fqdn for the machine
+#   Str        : the realm for the machine
+#   Num        : the kvno for the machine
+#   Str        : The keytab filename for the machine (default  : adjoin.keytab)
+#   Ref[Array] : A reference to the array of encryption types.
+# Output:
+#   N/A
+sub kt_write {
+    my $password  = (shift or '');
+    my $fqdn      = (shift or '');
+    my $realm     = (shift or '');
+    my $kvno      = (shift or 1);
+    my $keytab    = (shift or 'adjoin.keytab');
+    my @enc_types = @{(shift or [])};
+
+    my $host_principal = $fqdn."@".$realm;
+
+    my $spawn_ok;
+    my $timeout = 10;
+
+    my $exp = Expect->spawn("ktutil")
+        or die "Cannot spawn ktutil: $!";
+
+    foreach my $encryption_type (@enc_types) {
+        $exp->expect($timeout,
+            [
+            qr{ktutil:},
+            sub {
+                $spawn_ok = 1;
+                my $fh = shift;
+                $fh->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
+                exp_continue();
+            }
+            ],
+            [
+            qr{Password for host/$host_principal:"},
+            sub {
+                my $fh = shift;
+                $fh->send("$password\n");
+            }
+            ],
+            [
+            eof =>
+            sub {
+                if ($spawn_ok) {
+                    die "ERROR: premature EOF in ktutil.\n";
+                } else {
+                    die "ERROR: could not spawn ktutil.\n";
+                }
+            }
+            ],
+            [
+            timeout =>
+            sub {
+                die "No ktutil prompt.\n";
+            }
+            ],
+        );
+    }
+
+    $exp->expect($timeout,
+        [
+        qr{ktutil:},
+        sub {
+            my $fh = shift;
+            $fh->send("write_kt $keytab\n");
+            exp_continue();
+        }
+        ],
+        [
+        qr{ktutil:},
+        sub {
+            my $fh = shift;
+            $fh->send("quit\n");
+        }
+        ]
+    );
+
+    if ($exp) {
+        $exp->soft_close();
+    }
+
+}
+
+# Finalize the machine account
+sub finalize_machine_account {
+    my $upcase_nodename    = (shift or '');
+    my $baseDN             = (shift or '');
+    my $krb5ccname         = (shift or '');
+    my $userAccountControl = (shift or 0);
+    my $domain_controller  = (shift or '');
+    my $dryrun             = (shift or 0);
+    my $object_file        = (shift or generate_tmpfile("final_machine_obj.XXXXXX"));
+
+    my $object;
+
+    my @enc_types;
+
+    # TODO: I should really document what these numbers mean...
+    $userAccountControl += (524288 + 65536);
+
+    my $ldap_options = qq(-Q -Y gssapi);
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
+
+    print "Finding the supported encryption types.\n";
+    @enc_types = deduce_enc_types( $upcase_nodename, $baseDN, $krb5ccname,
+                                   $domain_controller, $dryrun );
+
+    if (grep !/arcfour/, @enc_types) {
+        $userAccountControl += 2097152;
+    }
+
+    print "Finalizing machine account.\n";
+
+    $object = <<ENDOBJECT;
+dn: CN=$upcase_nodename,$baseDN
+changetype: modify
+replace: userAccountControl
+userAccountControl: $userAccountControl
+ENDOBJECT
+
+    open FH, ">$object_file" or die "Couldn't open $object_file: $!";
+    print FH $object;
+    close FH;
+
+    if (!$dryrun) {
+        system(qq($krb5ccname ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
+    }
 }
 
 # Find out what encryption formats are supported in linux
