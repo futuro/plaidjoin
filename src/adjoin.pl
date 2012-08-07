@@ -1392,14 +1392,7 @@ check_nss_conf() or die "$nssfile does not use dns for hosts, which it (probably
 
 $upcase_nodename  = uc($nodename);
 $netbios_nodename = "$nodename\$";
-# This is probably wrong. What about a machine that's foo.cs.umn.edu and the domain
-# it should join is COSE.UMN.EDU? A bit unorthodox perhaps, but possible.
-# TODO: Investigate this possibility.
-# XXX: There is a possibility fqdn should be put together like the following. I /really/ doubt
-#       it, and assume, instead, that the original implementation was either flawed, or did not
-#       account for a machine with a different domain than the domain it's joining. This should
-#       be verified and, if true, remove this comment block.
-#$fqdn = "$nodename.$dom";
+$fqdn = hostfqdn();
 
 print "Looking for domain controllers and global catalogs (A RRs)\n";
 $DomainDnsZones = canon_resolve("DomainDnsZones.$domain.");
@@ -1569,6 +1562,43 @@ create_ldap_account( $object_file, $upcase_nodename, $baseDN,
 
 $machine_passwd = generate_and_set_passwd( $krb5ccname, $realm, $dryrun,
                                            $passlen, $minnum, $minlower, $minupper, $minspecial );
+
+print "Finding Key Version Number.\n";
+if (!$dryrun) {
+    $kvno = deduce_kvno( $domain_controller, $baseDN, $upcase_nodename, $krb5ccname );
+    print "KVNO: $kvno\n";
+}
+else {
+    print "Dryrun: KVNO is probably '$kvno'\n";
+}
+
+
+finalize_machine_account( $upcase_nodename, $baseDN, $krb5ccname,
+                          $userAccountControlBASE, $domain_controller, $dryrun );
+
+@enc_types = deduce_enc_types( $upcase_nodename, $baseDN, $krb5ccname, $domain_controller, $dryrun );
+
+kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
+
+if ($setup_config) {
+    setup_krb_files( $krb5conf, $keytab_file, $dryrun );
+}
+else {
+    print <<EOF;
+We're not setting up the configuration files.
+The kerberos config file can be found at "$krb5conf".
+The keytab can be found at "$keytab_file".
+Fiddle with and install as necessary.
+EOF
+}
+
+if ($^O eq 'solaris') {
+    doIDMAPconfig( $dryrun, $leave );
+}
+
+print "The machine is now joined to the domain, rejoice!\n";
+
+exit 0;
 
 __END__
 
