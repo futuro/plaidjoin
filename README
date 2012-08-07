@@ -1,3 +1,5 @@
+THIS SOFTWARE IS STILL IN ALPHA, I MAKE NO GUARANTEES ABOUT ITS CORRECTNESS
+
 Dependencies:
     ksetpass                       : From kadmin-remctl project
     ldap{add,search,delete,modify} : From ldap-utils
