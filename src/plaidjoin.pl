@@ -25,12 +25,12 @@ use Expect ();
 my $option_results;
 
 # Defaults
-my $cname_template="adjoin-krb5ccache.XXXXXX";
+my $cname_template="plaidjoin-krb5ccache.XXXXXX";
 my $container="CN=Computers";
 my $cprinc="Administrator";
-my $encrypt_template="adjoin-encryption-object.XXXXXX";
+my $encrypt_template="plaidjoin-encryption-object.XXXXXX";
 my $fqdn=hostfqdn();
-my $keytab_template="adjoin-krb5keytab.XXXXXX";
+my $keytab_template="plaidjoin-krb5keytab.XXXXXX";
 my $kvno=1;
 my $ldap_args="-o authzid= -o mech=gssapi"; # TODO: Verify these are actually correct
 my $minlower = 15;
@@ -39,7 +39,7 @@ my $minspecial = 15;
 my $minupper = 15;
 my $nodename=hostname();
 my $nssfile="/etc/nsswitch.conf";
-my $object_template="adjoin-computer-object.XXXXXX";
+my $object_template="plaidjoin-computer-object.XXXXXX";
 my $passlen = 80;
 my $port=3268;
 my $userAccountControlBASE=4096;
@@ -111,7 +111,7 @@ END {
     $? = $exitval;
 }
 
-if ($PROGRAM_NAME eq "adleave"){
+if ($PROGRAM_NAME eq "plaidleave"){
     $leave=1;
 }
 
@@ -141,11 +141,11 @@ sub setup_krb_files {
     my $keytab_mode = 0600;
 
     if (-e "$default_conf") {
-        cp("$default_conf", "$default_conf-pre-adjoin");
+        cp("$default_conf", "$default_conf-pre-plaidjoin");
     }
 
     if (-e "$default_keytab") {
-        cp("$default_keytab", "$default_keytab-pre-adjoin");
+        cp("$default_keytab", "$default_keytab-pre-plaidjoin");
     }
 
     if ( cp($krb5_conf, $default_conf) ) {
@@ -168,7 +168,7 @@ sub setup_krb_files {
 #   Str        : the fqdn for the machine
 #   Str        : the realm for the machine
 #   Num        : the kvno for the machine
-#   Str        : The keytab filename for the machine (default  : adjoin.keytab)
+#   Str        : The keytab filename for the machine (default  : plaidjoin.keytab)
 #   Ref[Array] : A reference to the array of encryption types.
 # Output:
 #   N/A
@@ -177,7 +177,7 @@ sub kt_write {
     my $fqdn      = (shift or '');
     my $realm     = (shift or '');
     my $kvno      = (shift or 1);
-    my $keytab    = (shift or 'adjoin.keytab');
+    my $keytab    = (shift or 'plaidjoin.keytab');
     my @enc_types = @{(shift or [])};
 
     my $host_principal = $fqdn."@".$realm;
@@ -674,7 +674,7 @@ ENDOBJECT
 # Ouput:
 #   Str: The path to the temp file
 sub generate_tmpfile {
-    my $template = (shift or 'default-adjoin-tmpfile.XXXXXX');
+    my $template = (shift or 'default-plaidjoin-tmpfile.XXXXXX');
     my $dir      = (shift or '/tmp');
 
     my $filename = '';
@@ -1035,7 +1035,7 @@ sub construct_krb5_conf {
     my @KDClist  = @{(shift || [])};
     my $kpasspwd = (shift || '');
     my $realm    = (shift || '');
-    my $template = (shift || 'adjoin-krb5.conf.XXXXXX');
+    my $template = (shift || 'plaidjoin-krb5.conf.XXXXXX');
 
     my $fh;
     my $filename;
@@ -1604,12 +1604,12 @@ __END__
 
 =head1 NAME
 
-adjoin - Join or Disjoin a computer from the domain.
+plaidjoin - Join or Disjoin a computer from the domain.
 
 =head1 SYNOPSIS
 
-Usage: adjoin  [options] [domain [nodename]]
-Usage: adleave [options] [domain [nodename]]
+Usage: plaidjoin  [options] [domain [nodename]]
+Usage: plaidleave [options] [domain [nodename]]
 
 Joins or leaves an Active Directory domain.  This includes:
 
@@ -1663,7 +1663,7 @@ TODO:
 
 Examples:
 
-	./adjoin.pl -p joe.admin example.com
+	./plaidjoin.pl -p joe.admin example.com
 
 =cut
 # vim: ts=4 sw=4 et fdm=syntax
