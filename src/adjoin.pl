@@ -632,7 +632,7 @@ replace: dNSHostname
 dNSHostname: $fqdn
 ENDOBJECT
 
-        open FH, "<$object_file" or die "Couldn't open $object_file: $!";
+        open FH, ">$object_file" or die "Couldn't open $object_file: $!";
         print FH $object;
         close FH;
 
