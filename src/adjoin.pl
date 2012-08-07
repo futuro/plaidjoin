@@ -692,7 +692,7 @@ sub generate_tmpfile {
 #   N/A
 # Output:
 #   1: Success (always)
-sub doIDMAPconfig {
+sub correct_idmap {
     my $dryrun = (shift or 0);
     my $leave  = (shift or 0);
 
@@ -788,7 +788,7 @@ sub sleuth_machine_bad_times {
     }
 
     if ($leave) {
-        doIDMAPconfig(); # This is specifically for SNV/OpenSolaris
+        correct_idmap(); # This is specifically for SNV/OpenSolaris
         my $base = ($0 =~ m|\./(.*)+|);
         print "$base: Done\n";
         exit 0;
@@ -928,8 +928,8 @@ sub find_site {
             next LINE unless ($line =~ s/^dn (.+)/$1/);
 
             print "\tLooking for subnet objects in its domain.\n";
-            $subnet_domain = dn2dns($line);
-            $ldapsrv = canon_resolve("DomainDnsZones.$subnet_domain");
+            $subnet_domain = dn_to_dns($line);
+            $ldapsrv = canonical_resolve("DomainDnsZones.$subnet_domain");
 
             $more_ldap_opts = "-Q -Y gssapi -b \"$line\" -s base \"\" siteObject";
             @more_results = qx($krb5ccname ldapsearch -h $ldapsrv $ldap_options);
@@ -974,7 +974,7 @@ sub find_forest {
     for my $line (@results) {
         if ($line =~ /^schema/) {
             $line =~ s/^\w+: CN=\w+,CN=\w+,//;
-            $forest = dn2dns($line);
+            $forest = dn_to_dns($line);
         }
     }
     return $forest;
@@ -1194,7 +1194,7 @@ sub enumerate_DCs {
 #   Str: The converted DN
 #   OR
 #   '' : There was no DN to convert
-sub dn2dns {
+sub dn_to_dns {
     my $dnDNS = '';
 
     my $DN = shift;
@@ -1215,7 +1215,7 @@ sub dn2dns {
 #   Str: The converted domain name
 #   OR
 #   '' : There was no domain to convert
-sub dns2dn {
+sub dns_to_dn {
     my $dnsDN = '';
 
     my $domainname = shift;
@@ -1250,7 +1250,7 @@ sub get_base_dn {
 
     if ($#ARGV == 0) {
         $domainname = shift;
-        $dnsDN      = dns2dn($domainname);
+        $dnsDN      = dns_to_dn($domainname);
         $baseDN     = $container . $dnsDN;
     }
 
@@ -1264,7 +1264,7 @@ sub get_base_dn {
 #   Str: The canonical FQDN for the domain
 #   OR
 #   '' : The empty string (if the input doesn't resolve to anything)
-sub canon_resolve {
+sub canonical_resolve {
     my $name = shift;
 
     my $cname = '';
@@ -1297,7 +1297,7 @@ sub canon_resolve {
 #   Str: The found domain (without the ending dot)
 #   OR
 #   '' : The empty string (nothing found)
-sub discover_domain {
+sub deduce_domain {
     my $query = Net::DNS::Resolver->new;
     my $response = $query->search('_ldap._tcp.dc._msdcs', 'SRV');
 
@@ -1313,7 +1313,7 @@ sub discover_domain {
 #   N/A
 # Output:
 #   Returns 1 for success and 0 for failure
-sub check_nss_conf {
+sub validate_nss_conf {
     open(my $nsswitch, "<$nssfile") or die("Can't open $nssfile: $!");
     for my $line (<$nsswitch>) {
         chomp($line);
@@ -1372,7 +1372,7 @@ elsif ($#ARGV >= 0) {
     }
 }
 else {
-    $domain = discover_domain();
+    $domain = deduce_domain();
     if ($domain) {
         print "Joining domain: $domain\n";
     }
@@ -1388,15 +1388,15 @@ if (!$cprinc){
     chomp($cprinc = <STDIN>);
 }
 
-check_nss_conf() or die "$nssfile does not use dns for hosts, which it (probably) should.\n";
+validate_nss_conf() or die "$nssfile does not use dns for hosts, which it (probably) should.\n";
 
 $upcase_nodename  = uc($nodename);
 $netbios_nodename = "$nodename\$";
 $fqdn = hostfqdn();
 
 print "Looking for domain controllers and global catalogs (A RRs)\n";
-$DomainDnsZones = canon_resolve("DomainDnsZones.$domain.");
-$ForestDnsZones = canon_resolve("ForestDnsZones.$domain.");
+$DomainDnsZones = canonical_resolve("DomainDnsZones.$domain.");
+$ForestDnsZones = canonical_resolve("ForestDnsZones.$domain.");
 
 $realm = uc($domain);
 
@@ -1593,7 +1593,7 @@ EOF
 }
 
 if ($^O eq 'solaris') {
-    doIDMAPconfig( $dryrun, $leave );
+    correct_idmap( $dryrun, $leave );
 }
 
 print "The machine is now joined to the domain, rejoice!\n";
