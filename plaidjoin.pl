@@ -675,6 +675,10 @@ userAccountControl: $userAccountControl
 dNSHostname: $fqdn
 ENDOBJECT
 
+        open FH, ">$object_file" or die "Couldn't open $object_file: $!";
+        print FH $object;
+        close FH;
+
         print "Creating the machine account in AD via LDAP.\n";
 
         system(qq($krb5ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
