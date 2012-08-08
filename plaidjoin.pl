@@ -758,7 +758,7 @@ sub sleuth_machine_bad_times {
     if (!$dryrun) {
         print "Checking for an existing account.\n";
         $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub sAMAccountName="$netbios_nodename" dn);
-        @results = qx(ldapsearch -h $domain_controller $ldap_options);
+        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
 
         for my $answer (@results) {
             next unless ($answer =~ s/^dn: (.+)/$1/);
