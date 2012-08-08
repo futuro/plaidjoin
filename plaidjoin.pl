@@ -213,7 +213,7 @@ sub kt_write {
                 $spawn_ok = 1;
                 my $fh = shift;
                 $fh->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
-                exp_continue();
+                Expect::exp_continue();
             }
             ],
             [
@@ -597,7 +597,7 @@ sub generate_and_set_passwd {
     #            everything is internal.
     if (!$dryrun) {
         ($escaped_machine_passwd = $machine_passwd) =~ s/([[:punct:]])/\\$1/g;
-        system(qq(echo -n '$escaped_machine_passwd' |$krb5ccname ksetpass host/$userPrincipalName)) == 0
+        system(qq(echo -n $escaped_machine_passwd |$krb5ccname ksetpass host/$userPrincipalName)) == 0
             or die "ERROR: Could not set the machine password; dying: ";
     }
 
