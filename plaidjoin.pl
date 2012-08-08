@@ -411,7 +411,7 @@ sub deduce_solaris_enc_info {
 
 # Set's the encryption type in the ldap object
 # TODO: Write this comment header
-sub deduce_enc_type {
+sub deduce_enc_types {
     my $upcase_nodename    = (shift or '');
     my $baseDN             = (shift or '');
     my $krb5ccname         = (shift or '');
