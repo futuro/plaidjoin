@@ -1258,22 +1258,17 @@ sub dns_to_dn {
 #   OR
 #   '' : The empty string, because nothing was given or found
 sub get_base_dn {
-    my $baseDN = '';
+    my $domainname = (shift or '');
+    my $container  = (shift or '');
 
-    my $container  = '';
-    my $domainname = '';
+    my $baseDN = '';
 
     my $dnsDN = '';
 
-    if ($#ARGV == 1) {
-        $container = (shift) . ",";
-    }
+    $container = ($container . ",") unless !$container;
 
-    if ($#ARGV == 0) {
-        $domainname = shift;
-        $dnsDN      = dns_to_dn($domainname);
-        $baseDN     = $container . $dnsDN;
-    }
+    $dnsDN  = dns_to_dn($domainname);
+    $baseDN = $container . $dnsDN;
 
     return $baseDN;
 }
@@ -1421,7 +1416,7 @@ $ForestDnsZones = canonical_resolve("ForestDnsZones.$domain.");
 
 $realm = uc($domain);
 
-$baseDN = get_base_dn($container, $domain);
+$baseDN = get_base_dn($domain, $container);
 
 print "Looking for KDCs and DCs (SRV RRs)\n";
 @KDClist = enumerate_KDCs($domain);
