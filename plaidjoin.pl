@@ -534,6 +534,8 @@ sub deduce_kvno {
         last;
     }
 
+    chomp $kvno;
+
     return $kvno;
 }
 
