@@ -202,67 +202,28 @@ sub kt_write {
     my $spawn_ok;
     my $timeout = 10;
 
-    my $exp = Expect->spawn("ktutil")
+    my $ktutil = Expect->spawn("ktutil")
         or die "Cannot spawn ktutil: $!";
 
     foreach my $encryption_type (@enc_types) {
-        $exp->expect($timeout,
-            [
-            qr{ktutil:},
-            sub {
-                $spawn_ok = 1;
-                my $fh = shift;
-                $fh->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
-                Expect::exp_continue();
-            }
-            ],
-            [
-            qr{Password for host/$host_principal:"},
-            sub {
-                my $fh = shift;
-                $fh->send("$password\n");
-            }
-            ],
-            [
-            eof =>
-            sub {
-                if ($spawn_ok) {
-                    die "ERROR: premature EOF in ktutil.\n";
-                } else {
-                    die "ERROR: could not spawn ktutil.\n";
-                }
-            }
-            ],
-            [
-            timeout =>
-            sub {
-                die "No ktutil prompt.\n";
-            }
-            ],
-        );
+        unless ($ktutil->expect($timeout, 'ktutil:')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $spawn_ok = 1;
+        $ktutil->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
+
+        unless ($ktutil->expect($timeout, 'Password for host')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $ktutil->send("$password\n");
     }
 
-    $exp->expect($timeout,
-        [
-        qr{ktutil:},
-        sub {
-            my $fh = shift;
-            $fh->send("write_kt $keytab\n");
-            exp_continue();
-        }
-        ],
-        [
-        qr{ktutil:},
-        sub {
-            my $fh = shift;
-            $fh->send("quit\n");
-        }
-        ]
-    );
-
-    if ($exp) {
-        $exp->soft_close();
+    unless ($ktutil->expect($timeout, 'ktutil:')){
+        die "ERROR: Couldn't write keytab file before losing connection to ktutil; dying.";
     }
+    $ktutil->send("write_kt $keytab\n");
+    $ktutil->send("quit\n");
+    $ktutil->soft_close();
 
 }
 
