@@ -8,6 +8,16 @@ require "Files.pm";
 use subs qw(
     deduce_linux_enc_info deduce_solaris_enc_info deduce_and_set_enc_types );
 
+BEGIN {
+    require Exporter;
+
+    # Inherit from Exporter to export functions and variables
+    our @ISA = qw(Exporter);
+
+    # Functions and variables which are exported by default
+    our @EXPORT = qw( deduce_linux_enc_info deduce_solaris_enc_info deduce_and_set_enc_types );
+}
+
 # Find out what encryption formats are supported in linux
 # TODO: I can't decide if I would prefer to have an 'if' block to deal with the case
 #       where $^O ne "linux", thus reducing the nest level of the routine. The downside

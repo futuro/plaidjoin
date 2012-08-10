@@ -11,6 +11,17 @@ use File::Copy qw(cp);
 use subs qw(
     setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
 
+BEGIN {
+    require Exporter;
+
+    # Inherit from Exporter to export functions and variables
+    our @ISA = qw(Exporter);
+
+    # Functions and variables which are exported by default
+    our @EXPORT =qw(
+        setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
+}
+
 # Construct the contents of the new krb5.conf file, write them into a temp file,
 # then return that file name.
 # Input:

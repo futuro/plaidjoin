@@ -10,6 +10,19 @@ use subs qw(
     dot_quad_to_num enumerate_subnets dn_to_dns dns_to_dn get_SRVs canonical_resolve
     deduce_domain get_base_dn enumerate_KPWs enumerate_GCs enumerate_KDCs enumerate_DCs );
 
+BEGIN {
+    require Exporter;
+
+    # Inherit from Exporter to export functions and variables
+    our @ISA = qw(Exporter);
+
+    # Functions and variables which are exported by default
+    our @EXPORT = qw(
+        dns_search check_dnssrv netmask_to_length num_to_dot_quad
+        dot_quad_to_num enumerate_subnets dn_to_dns dns_to_dn get_SRVs canonical_resolve
+        deduce_domain get_base_dn enumerate_KPWs enumerate_GCs enumerate_KDCs enumerate_DCs );
+}
+
 # Do a DNS search for the 'record' associated with 'name'
 # TODO: Think about better incorporating the verbose variable (is it only for warnings,
 #       or should it be for everything).

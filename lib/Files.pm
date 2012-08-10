@@ -8,6 +8,16 @@ use File::Temp qw(tempfile);
 use subs qw(
     generate_tmpfile );
 
+BEGIN {
+    require Exporter;
+
+    # Inherit from Exporter to export functions and variables
+    our @ISA = qw(Exporter);
+
+    # Functions and variables which are exported by default
+    our @EXPORT = qw( generate_tmpfile );
+}
+
 # Generate a temp file name (e.g. "/tmp/foo.bar.1241"). Don't open it.
 # Defaults:
 #   Str: the template has a defualt
