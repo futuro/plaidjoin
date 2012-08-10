@@ -1,5 +1,8 @@
 package DNS;
 
+use strict;
+use warnings;
+
 use Net::DNS;
 
 use subs qw(

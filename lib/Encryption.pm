@@ -1,5 +1,8 @@
 package Encryption;
 
+use strict;
+use warnings;
+
 require "Files.pm";
 
 use subs qw(

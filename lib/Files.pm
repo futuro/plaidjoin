@@ -1,5 +1,8 @@
 package Files;
 
+use strict;
+use warnings;
+
 use File::Temp qw(tempfile);
 
 use subs qw(

@@ -1,5 +1,8 @@
 package Kerberos;
 
+use strict;
+use warnings;
+
 use Expect           qw();
 use Net::Domain      qw(hostfqdn);
 use String::MkPasswd qw(mkpasswd);
