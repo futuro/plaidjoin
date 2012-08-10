@@ -3,7 +3,7 @@ package Encryption;
 require "Files.pm";
 
 use subs qw(
-    deduce_linux_enc_info deduce_solaris_enc_info deduce_enc_types );
+    deduce_linux_enc_info deduce_solaris_enc_info deduce_and_set_enc_types );
 
 # Find out what encryption formats are supported in linux
 # TODO: I can't decide if I would prefer to have an 'if' block to deal with the case
