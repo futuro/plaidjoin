@@ -24,7 +24,8 @@ use subs qw(
 #   ''          : Nothing was passed to the function, so nothing was constructed
 sub construct_krb5_conf {
     my @KDClist  = @{(shift || [])};
-    my $kpasspwd = (shift || '');
+    my $kpasswd  = (shift || '');
+    my $domain   = (shift || '');
     my $realm    = (shift || '');
     my $template = (shift || 'plaidjoin-krb5.conf.XXXXXX');
 

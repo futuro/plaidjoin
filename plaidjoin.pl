@@ -614,7 +614,7 @@ for my $pair (@KPWlist) {
     print "\nName: ${$pair}{name}\nPort: ${$pair}{port}\n";
 }
 
-$krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $realm);
+$krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $domain, $realm);
 $krb5ccname = generate_tmpfile($cname_template);
 $keytab_file = generate_tmpfile($keytab_template);
 
