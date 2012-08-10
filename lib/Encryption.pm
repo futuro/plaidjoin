@@ -3,7 +3,11 @@ package Encryption;
 use strict;
 use warnings;
 
-require "Files.pm";
+use FindBin qw($Bin);
+FindBin::again();
+use lib "$Bin";
+
+use Files;
 
 use subs qw(
     deduce_linux_enc_info deduce_solaris_enc_info deduce_and_set_enc_types );
