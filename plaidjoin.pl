@@ -33,7 +33,6 @@ use Pod::Usage;
 use Net::Domain qw(hostname hostfqdn hostdomain);
 
 use File::Temp qw(tempfile);
-use File::Copy qw(cp);
 
 use lib "$Bin/lib";
 use DNS;
