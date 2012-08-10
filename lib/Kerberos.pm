@@ -6,7 +6,8 @@ use warnings;
 use Expect           qw();
 use Net::Domain      qw(hostfqdn);
 use String::MkPasswd qw(mkpasswd);
-use File::Copy qw(cp);
+use File::Copy       qw(cp);
+use File::Temp       qw(tempfile);
 
 use subs qw(
     setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
