@@ -1,3 +1,11 @@
+Figure out how to get an rc file read
+    I don't really understand how to load an RC file for this, but it would be kind of
+    nice if I could specify options in a config file, instead of right in plaidjoin.pl
+
+Look into Kerberos and LDAP perl modules
+    I would eventually like to cut down on the number of external dependencies, so I
+    should look into KRB5 and (kerberized) LDAP perl modules.
+
 Have OS specific sub-dirs for the modules
     Something like '$^O/ldap.pm', allowing new platforms to be supported
     by having sub directories named after how perl encodes your OS. They would all
