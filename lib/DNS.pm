@@ -1,6 +1,5 @@
 package DNS;
 
-use Net::Domain qw(hostname hostfqdn hostdomain);
 use Net::DNS;
 
 use subs qw(
