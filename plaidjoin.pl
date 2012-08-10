@@ -65,14 +65,12 @@ my $object_template="plaidjoin-computer-object.XXXXXX";
 my $passlen = 80;
 my $port=3268;
 my $userAccountControlBASE=4096;
-#my osvers=$(uname -r); # I don't think this will be necessary in the port
 
 # Bools
 my $help='';
 my $man='';
 
 my $debug='';
-#my $debug_shell='';
 my $dryrun=''; # TODO: There should be a wrapper function to enable dryrun functions
 my $extra_force='';
 my $force='';
@@ -83,11 +81,7 @@ my $verbose='';
 
 my $add_account="1";
 my $join="1";
-# There will be a "dryrun" type function to enforce the dryrun option. As such, there will be just
-# 'dryrun', and no 'notdryrun'.
-#my $notdryrun="1"; # This is a bool that represents whether we are doing a dry run. See dryrun
 my $setup_config="1";
-#my $verbose_cat="1";
 
 # Placeholder vars
 my $baseDN='';
