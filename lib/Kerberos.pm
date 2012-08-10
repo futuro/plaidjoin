@@ -1,0 +1,232 @@
+package Kerberos;
+
+use Expect           qw();
+use Net::Domain      qw(hostfqdn);
+use String::MkPasswd qw(mkpasswd);
+
+use subs qw(
+    setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
+
+# Construct the contents of the new krb5.conf file, write them into a temp file,
+# then return that file name.
+# Input:
+#   Array[Hash] : The list of KDCs
+#   Str         : The kpasswd server string
+#   Str         : The realm we're connecting to
+#   Str         : The template to use when constructing the temp file (Optional)
+# Output:
+#   Str         : The name of the temporary file
+#   OR
+#   ''          : Nothing was passed to the function, so nothing was constructed
+sub construct_krb5_conf {
+    my @KDClist  = @{(shift || [])};
+    my $kpasspwd = (shift || '');
+    my $realm    = (shift || '');
+    my $template = (shift || 'plaidjoin-krb5.conf.XXXXXX');
+
+    my $fh;
+    my $filename;
+
+    my $krb5conf   = '';
+    my $kdcstrings = "";
+
+    if (!@KDClist || !$kpasswd || !$realm) {
+        warn "Missing KDClist, kpasswd, and realm entries in construct_krb5_conf.\n";
+        warn "Returning the empty list.\n";
+        return '';
+    }
+
+    for my $pair (@KDClist) {
+        $kdcstrings .= "kdc = ${$pair}{name}\n\t";
+    }
+    # TODO: Is there a better way to do this?
+    $kdcstrings =~ s/\n\t$//;
+
+    $krb5conf = <<ENDCONF;
+[libdefaults]
+    default_realm = $realm
+
+[realms]
+    $realm = {
+        $kdcstrings
+        admin_server = $kpasswd
+        kpasswd_server = $kpasswd
+        kpasswd_protocol = SET_CHANGE
+    }
+
+[domain_realm]
+    .$domain = $realm
+    $domain = $realm
+ENDCONF
+
+    ($fh, $filename) = tempfile( $template, DIR => '/tmp' );
+    print $fh $krb5conf;
+    close $fh;
+
+    return $filename;
+}
+
+# Creates and sets the ldap machine password
+# NOTE: If all of the minimum options ($minnum et.al.) add up to more than
+#       $passlen, $passlen will be divided by the number of options, converted to
+#       an int, and then the minimums will be set to that number.
+# Input:
+#   Str : The file name for the kerberos ticket cache
+#   Str : The realm we're associating with
+#   Bool: Whether this is a dryrun or not
+#   Num : The length of the password to use
+#   Num : The minimum number of number characters to use
+#   Num : The minimum number of lower case characters to use
+#   Num : The minimum number of upper case characters to use
+#   Num : The minimum number of special characters to use
+# Output:
+#   Str : The new machine password
+sub generate_and_set_passwd {
+    my $krb5ccname = (shift or '');
+    my $realm      = (shift or '');
+    my $dryrun     = (shift or '');
+    my $passlen    = (shift or 80);
+    my $minnum     = (shift or 15);
+    my $minlower   = (shift or 15);
+    my $minupper   = (shift or 15);
+    my $minspecial = (shift or 15);
+
+    my $fqdn = hostfqdn();
+
+    my $userPrincipalName = $fqdn."@".$realm;
+
+    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
+
+    my $escaped_machine_passwd;
+    my $machine_passwd;
+
+    # If the specified minimums are greater than the password length, divide the password
+    # length by four (the number of options), make it an int (which truncates the number),
+    # and set all of the minimums to that.
+    if (($minlower + $minnum + $minupper + $minspecial) > $passlen) {
+        my $diff = int($passlen/4);
+        $minlower   = $diff;
+        $minnum     = $diff;
+        $minupper   = $diff;
+        $minspecial = $diff;
+    }
+
+    # Generate a random password with a length of 80 and at least 15 numbers, lower case letters,
+    # upper case letters and special characters. The other 20 characters are filled randomly.
+    $machine_passwd = mkpasswd(
+        -length     => $passlen,
+        -minnum     => $minnum,
+        -minlower   => $minlower,
+        -minupper   => $minupper,
+        -minspecial => $minspecial );
+    # XXX: The potential issue with this method is that the machine password will
+    #      show up in the ps list, atleast for as long as it takes to set the password.
+    #      A possible alternative would be to open ksetpass with a pipe, then write to the pipe.
+    #      TODO: Something like what I just described, or maybe implement ksetpass in perl so
+    #            everything is internal.
+    if (!$dryrun) {
+        ($escaped_machine_passwd = $machine_passwd) =~ s/([[:punct:]])/\\$1/g;
+        system(qq(echo -n $escaped_machine_passwd |$krb5ccname ksetpass host/$userPrincipalName)) == 0
+            or die "ERROR: Could not set the machine password; dying: ";
+    }
+
+    return $machine_passwd;
+}
+
+# Move over the configuration and keytab files
+# Input:
+#   Str  : Location of the config files
+#   Str  : Location of the keytab file
+#   Bool : Whether we're doing a dryrun (default: False)
+#   Bool : Whether we're being verbose (default: False)
+# Output:
+#   N/A
+sub setup_krb_files {
+    my $krb5_conf    = (shift or '');
+    my $keytab       = (shift or '');
+    my $dryrun       = (shift or 0);
+    my $verbose      = (shift or 0);
+
+    # If this is a dryrun, just return
+    if ($dryrun) {
+        return;
+    }
+
+    my $default_conf   = "/etc/krb5.conf";
+    my $default_keytab = "/etc/krb5.keytab";
+
+    my $conf_mode   = 0644;
+    my $keytab_mode = 0600;
+
+    if (-e "$default_conf") {
+        cp("$default_conf", "$default_conf-pre-plaidjoin");
+    }
+
+    if (-e "$default_keytab") {
+        cp("$default_keytab", "$default_keytab-pre-plaidjoin");
+    }
+
+    if ( cp($krb5_conf, $default_conf) ) {
+        chmod $conf_mode, $default_conf;
+    }
+    else {
+        warn "Unable to copy $krb5_conf to $default_conf.";
+    }
+    if ( cp($keytab, $default_keytab) ) {
+        chmod $keytab_mode, $default_keytab;
+    }
+    else {
+        warn "Unable to copy $keytab to $default_keytab.";
+    }
+}
+
+# Create a keytab file for the machine account
+# Input:
+#   Str        : The password for the machine account
+#   Str        : the fqdn for the machine
+#   Str        : the realm for the machine
+#   Num        : the kvno for the machine
+#   Str        : The keytab filename for the machine (default  : plaidjoin.keytab)
+#   Ref[Array] : A reference to the array of encryption types.
+# Output:
+#   N/A
+sub kt_write {
+    my $password  = (shift or '');
+    my $fqdn      = (shift or '');
+    my $realm     = (shift or '');
+    my $kvno      = (shift or 1);
+    my $keytab    = (shift or 'plaidjoin.keytab');
+    my @enc_types = @{(shift or [])};
+
+    my $host_principal = $fqdn."@".$realm;
+
+    my $spawn_ok;
+    my $timeout = 10;
+
+    my $ktutil = Expect->spawn("ktutil")
+        or die "Cannot spawn ktutil: $!";
+
+    foreach my $encryption_type (@enc_types) {
+        unless ($ktutil->expect($timeout, 'ktutil:')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $spawn_ok = 1;
+        $ktutil->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
+
+        unless ($ktutil->expect($timeout, 'Password for host')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $ktutil->send("$password\n");
+    }
+
+    unless ($ktutil->expect($timeout, 'ktutil:')){
+        die "ERROR: Couldn't write keytab file before losing connection to ktutil; dying.";
+    }
+    $ktutil->send("write_kt $keytab\n");
+    $ktutil->send("quit\n");
+    $ktutil->soft_close();
+
+}
+
+1;
+# vim: ts=4 sw=4 et fdm=syntax
