@@ -40,6 +40,7 @@ use Files;
 
 my $option_results;
 
+# GLOBALS
 my $ACCOUNTDISABLE = 2;
 my $PASSWD_NOTREQD = 32;
 my $WORKSTATION_TRUST_ACCOUNT = 4096;
