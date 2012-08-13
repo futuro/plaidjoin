@@ -154,17 +154,17 @@ sub deduce_and_set_enc_types {
     }
 
     if (${enc_info}{minkeysize} == 128 and ${enc_info}{maxkeysize} == 256) {
-        $val              = "00000018";
+        $val              = 0x18;
         $aes128_supported = 1;
         $aes256_supported = 1;
     }
     elsif (${enc_info}{minkeysize} == 128) {
-        $val              = "00000008";
+        $val              = 0x8;
         $aes128_supported = 1;
         $aes256_supported = 0;
     }
     elsif (${enc_info}{maxkeysize} == 256) {
-        $val              = "00000010";
+        $val              = 0x10;
         $aes128_supported = 0;
         $aes256_supported = 1;
     }

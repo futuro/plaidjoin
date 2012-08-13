@@ -708,17 +708,6 @@ sleuth_machine_bad_times( $baseDN, $netbios_nodename, $krb5ccname,
                           $domain_controller, $ignore_existing, $modify_existing,
                           $extra_force, $leave, $verbose );
 
-##
-## Main course (apparently)
-##
-#
-#  The key here are the userPrincipalName, servicePrincipalName and
-#  userAccountControl attributes.  Note that servicePrincipalName must
-#  not have the @REALM part while userPrincipalName must have it.  And
-#  userAccountControl MUST NOT have the DONT_REQ_PREAUTH flag (unless
-#  krb5.conf is going to be written so we always do pre-auth) -- no
-#  pre-auth, no LDAP lookups.
-#
 $object_file = generate_tmpfile($object_template);
 
 create_ldap_account( $object_file, $upcase_nodename, $baseDN,
