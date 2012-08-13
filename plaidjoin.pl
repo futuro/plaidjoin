@@ -40,6 +40,12 @@ use Files;
 
 my $option_results;
 
+my $ACCOUNTDISABLE = 2;
+my $PASSWD_NOTREQD = 32;
+my $WORKSTATION_TRUST_ACCOUNT = 4096;
+my $DONT_EXPIRE_PASSWD = 65536;
+my $TRUSTED_FOR_DELEGATION = 524288;
+
 # Defaults
 my $cname_template="plaidjoin-krb5ccache.XXXXXX";
 my $container="CN=Computers";
@@ -58,7 +64,7 @@ my $nssfile="/etc/nsswitch.conf";
 my $object_template="plaidjoin-computer-object.XXXXXX";
 my $passlen = 80;
 my $port=3268;
-my $userAccountControlBASE=4096;
+my $userAccountControlBASE = $WORKSTATION_TRUST_ACCOUNT;
 
 # Bools
 my $help='';
@@ -139,8 +145,7 @@ sub finalize_machine_account {
 
     my @enc_types;
 
-    # TODO: I should really document what these numbers mean...
-    $userAccountControl += (524288 + 65536);
+    $userAccountControl += ($TRUSTED_FOR_DELEGATION + $DONT_EXPIRE_PASSWD);
 
     my $ldap_options = qq(-Q -Y gssapi);
     $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
@@ -148,10 +153,6 @@ sub finalize_machine_account {
     print "Finding the supported encryption types.\n";
     @enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN, $krb5ccname,
                                    $domain_controller, $dryrun );
-
-    if (grep !/arcfour/, @enc_types) {
-        $userAccountControl += 2097152;
-    }
 
     print "Finalizing machine account.\n";
 
@@ -224,7 +225,7 @@ sub create_ldap_account {
     my $ignore_existing        = (shift or '');
 
     my $fqdn = hostfqdn();
-    my $userAccountControl = ($userAccountControlBASE + 32 + 2);
+    my $userAccountControl = ($userAccountControlBASE + $PASSWD_NOTREQD + $ACCOUNTDISABLE);
     my $userPrincipalName = $fqdn."@".$realm;
 
     my $ldap_options = qq(-Q -Y gssapi);
