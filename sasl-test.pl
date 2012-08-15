@@ -39,6 +39,9 @@ $ccache->store_cred($creds);
 ##      and the GSSAPI documentation as well, I haven't found a good way to use a different location
 ##      for the keytab aside from setting KRB5CCNAME. There is no way to initialize a new GSSAPI::Cred
 ##      object to pass in anywhere. I am simply at a loss as to how to do this any other way
+##
+##      On the plus(negative?) side, setting this once will affect the whole program, and can be picked
+##      up by child processes.
 $ENV{KRB5CCNAME}="/tmp/plaidjoin_sasltest";
 print "\$KRB5CCNAME is \"$ENV{KRB5CCNAME}\"\n";
 my $sasl = Authen::SASL->new(
