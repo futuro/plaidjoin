@@ -124,7 +124,6 @@ sub deduce_solaris_enc_info {
 sub deduce_and_set_enc_types {
     my $upcase_nodename    = (shift or '');
     my $baseDN             = (shift or '');
-    my $krb5ccname         = (shift or '');
     my $domain_controller  = (shift or '');
     my $object_file        = (shift or generate_tmpfile("enc_obj.XXXXXX"));
     my $dryrun             = (shift or 0);
@@ -138,7 +137,6 @@ sub deduce_and_set_enc_types {
     my @enc_types;
 
     my $ldap_options = qq(-Q -Y gssapi);
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     if ($^O eq "linux") {
         %enc_info = deduce_linux_enc_info();
@@ -185,7 +183,7 @@ ENDOBJECT
     close FH;
 
     if (!$dryrun) {
-        system(qq($krb5ccname ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
+        system(qq(ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
         if ($? != 0) {
             $aes128_supported = 0;
             $aes256_supported = 0;

@@ -99,7 +99,6 @@ ENDCONF
 # Output:
 #   Str : The new machine password
 sub generate_and_set_passwd {
-    my $krb5ccname = (shift or '');
     my $realm      = (shift or '');
     my $dryrun     = (shift or '');
     my $passlen    = (shift or 80);
@@ -111,8 +110,6 @@ sub generate_and_set_passwd {
     my $fqdn = hostfqdn();
 
     my $userPrincipalName = $fqdn."@".$realm;
-
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     my $escaped_machine_passwd;
     my $machine_passwd;
@@ -143,7 +140,7 @@ sub generate_and_set_passwd {
     #            everything is internal.
     if (!$dryrun) {
         ($escaped_machine_passwd = $machine_passwd) =~ s/([[:punct:]])/\\$1/g;
-        system(qq(echo -n $escaped_machine_passwd |$krb5ccname ksetpass host/$userPrincipalName)) == 0
+        system(qq(echo -n $escaped_machine_passwd |ksetpass host/$userPrincipalName)) == 0
             or die "ERROR: Could not set the machine password; dying: ";
     }
 
