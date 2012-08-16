@@ -28,6 +28,7 @@ ReadMode('restore');
 print "\n";
 
 my $creds = Authen::Krb5::get_init_creds_password($princ, $pass);
+undef $pass; # Clear the variable so we're not storing sensitive plaintext data in memory
 my $ccache = Authen::Krb5::cc_resolve("FILE:/tmp/plaidjoin_sasltest");
 #my $ccache = Authen::Krb5::cc_default();
 Authen::Krb5::Ccache::initialize($ccache, $princ);
@@ -44,12 +45,7 @@ $ccache->store_cred($creds);
 ##      up by child processes.
 $ENV{KRB5CCNAME}="/tmp/plaidjoin_sasltest";
 print "\$KRB5CCNAME is \"$ENV{KRB5CCNAME}\"\n";
-my $sasl = Authen::SASL->new(
-            mechanism => 'GSSAPI',
-            #callback => {
-                #auth => $ccache
-            #},
-        );
+my $sasl = Authen::SASL->new( mechanism => 'GSSAPI', );
 
 my $ldap = Net::LDAP->new(
         $host,
