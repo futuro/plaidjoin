@@ -174,7 +174,7 @@ sub deduce_and_set_enc_types {
     $object = <<ENDOBJECT;
 dn: CN=$upcase_nodename,$baseDN
 changetype: modify
-add: msDS-SupportedEncryptionTypes
+replace: msDS-SupportedEncryptionTypes
 msDS-SupportedEncryptionTypes: $val
 ENDOBJECT
 
