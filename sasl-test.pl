@@ -34,6 +34,10 @@ my $ccache = Authen::Krb5::cc_resolve("FILE:/tmp/plaidjoin_sasltest");
 Authen::Krb5::Ccache::initialize($ccache, $princ);
 $ccache->store_cred($creds);
 
+my $ktab = Authen::Krb5::kt_resolve("/tmp/plaidjoin_sasltest.keytab");
+my $ktentry = Authen::Krb5::KeytabEntry->new($princ, 9, $creds->keyblock());
+$ktab->add_entry($ktentry);
+
 ## XXX: This is currently the only way I know of to pass a non-default ticket location
 ##      to SASL. In Authen::SASL::Perl::GSSAPI(3m), it speaks of passing in a GSSAPI::Cred object
 ##      via the Authen::SASL callback hash using the 'pass' key. Diggin into the GSSAPI perl module,
@@ -60,8 +64,6 @@ $ldap->bind( sasl => $sasl ) or die $@, $sasl->error(), "\n Terminating.\n";
 
 print "SASL bind to $host successful.\n";
 
-sub getpass {
-    my $passwd;
-}
+Authen::Krb5::free_context($krb5con);
 
 # vim: ts=4 sw=4 et fdm=syntax
