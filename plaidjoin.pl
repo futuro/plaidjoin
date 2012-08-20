@@ -136,7 +136,6 @@ if ($PROGRAM_NAME eq "plaidleave"){
 sub finalize_machine_account {
     my $upcase_nodename    = (shift or '');
     my $baseDN             = (shift or '');
-    my $krb5ccname         = (shift or '');
     my $userAccountControl = (shift or 0);
     my $domain_controller  = (shift or '');
     my $dryrun             = (shift or 0);
@@ -149,10 +148,9 @@ sub finalize_machine_account {
     $userAccountControl += ($TRUSTED_FOR_DELEGATION + $DONT_EXPIRE_PASSWD);
 
     my $ldap_options = qq(-Q -Y gssapi);
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     print "Finding the supported encryption types.\n";
-    @enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN, $krb5ccname,
+    @enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN,
                                    $domain_controller, $dryrun );
 
     print "Finalizing machine account.\n";
@@ -169,7 +167,7 @@ ENDOBJECT
     close FH;
 
     if (!$dryrun) {
-        system(qq($krb5ccname ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
+        system(qq(ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
     }
 }
 
@@ -181,13 +179,11 @@ sub deduce_kvno {
     my $domain_controller = (shift or '');
     my $baseDN            = (shift or '');
     my $upcase_nodename   = (shift or '');
-    my $krb5ccname        = (shift or '');
 
     my $kvno = 1;
 
     my $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub "cn=$upcase_nodename" msDS-KeyVersionNumber);
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
-    my @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
+    my @results = qx(ldapsearch -h $domain_controller $ldap_options);
 
     foreach my $line (@results) {
         next unless (($kvno = $line) =~ s/^msDS-KeyVersionNumber: (.+)/$1/);
@@ -219,7 +215,6 @@ sub create_ldap_account {
     my $baseDN                 = (shift or '');
     my $netbios_nodename       = (shift or '');
     my $realm                  = (shift or '');
-    my $krb5ccname             = (shift or '');
     my $userAccountControlBASE = (shift or 0);
     my $domain_controller      = (shift or '');
     my $modify_existing        = (shift or '');
@@ -231,8 +226,6 @@ sub create_ldap_account {
 
     my $ldap_options = qq(-Q -Y gssapi);
     my $object;
-
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     if ($modify_existing) {
         $object = <<ENDOBJECT;
@@ -253,7 +246,7 @@ ENDOBJECT
         close FH;
 
         print "A machine account already exists; resetting it.\n";
-        system(qq($krb5ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+        system(qq(ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
             or die "Could not add the new object to AD: $!";
     }
     elsif ($ignore_existing) {
@@ -277,7 +270,7 @@ ENDOBJECT
 
         print "Creating the machine account in AD via LDAP.\n";
 
-        system(qq($krb5ccname ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
+        system(qq(ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
             or die "Could not add the new object to AD: $!";
     }
 }
@@ -321,15 +314,12 @@ sub correct_idmap {
 sub sleuth_machine_bad_times {
     my $baseDN            = (shift or '');
     my $netbios_nodename  = (shift or '');
-    my $krb5ccname        = (shift or '');
     my $domain_controller = (shift or '');
     my $ignore_existing   = (shift or 0);
     my $modify_existing   = (shift or 0);
     my $extra_force       = (shift or 0);
     my $leave             = (shift or 0);
     my $verbose           = (shift or 0);
-
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
 
     my $distinct_name = '';
 
@@ -339,7 +329,7 @@ sub sleuth_machine_bad_times {
     if (!$dryrun) {
         print "Checking for an existing account.\n";
         $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub sAMAccountName="$netbios_nodename" dn);
-        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
+        @results = qx(ldapsearch -h $domain_controller $ldap_options);
 
         for my $answer (@results) {
             next unless ($answer =~ s/^dn: (.+)/$1/);
@@ -359,7 +349,7 @@ sub sleuth_machine_bad_times {
         print "Inspecting machine account for other objects.\n";
 
         $ldap_options = qq(-Q -Y gssapi -b "$distinct_name" -s sub "" dn);
-        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
+        @results = qx(ldapsearch -h $domain_controller $ldap_options);
         for my $answer (@results) {
             next unless (($answer =~ s/^dn: (.+)/$1/) and ($distinct_name ne $answer));
 
@@ -368,7 +358,7 @@ sub sleuth_machine_bad_times {
 
             if ($extra_force) {
                 print "Deleting the following object: $sub_dn\n";
-                system(qq($krb5ccname ldapdelete -h "$domain_controller" $ldap_options "$answer"));
+                system(qq(ldapdelete -h "$domain_controller" $ldap_options "$answer"));
             }
             else {
                 print "The following object must be deleted (use -f -f, -r or -i): $sub_dn\n";
@@ -377,7 +367,7 @@ sub sleuth_machine_bad_times {
 
         if ($force or $leave) {
             print "Deleting existing machine account.\n";
-            system(qq($krb5ccname ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
+            system(qq(ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
         }
         elsif (!$modify_existing or !$ignore_existing) {
             warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
@@ -406,7 +396,6 @@ sub sleuth_machine_bad_times {
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_site {
-    my $krb5ccname        = (shift || ''); # This should probably do something when it fails...
     my $domain_controller = (shift || ''); # This too
 
     my $site_name      = '';
@@ -418,14 +407,12 @@ sub find_site {
     my $ldap_options = '-Q -Y gssapi -b "" -s sub';
     my $more_ldap_opts = '';
 
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
-
     my @subnets = enumerate_subnets();
     SUBNET:
     for my $subnet (@subnets) {
 
         print "\tLooking for subnet object in the global catalog.\n";
-        @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
+        @results = qx(ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
 
         LINE:
         for my $line (@results) {
@@ -439,7 +426,7 @@ sub find_site {
             $ldapsrv = canonical_resolve("DomainDnsZones.$subnet_domain");
 
             $more_ldap_opts = "-Q -Y gssapi -b \"$line\" -s base \"\" siteObject";
-            @more_results = qx($krb5ccname ldapsearch -h $ldapsrv $ldap_options);
+            @more_results = qx(ldapsearch -h $ldapsrv $ldap_options);
 
             SITEDN:
             for my $line (@more_results) {
@@ -468,15 +455,13 @@ sub find_site {
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_forest {
-    my $krb5ccname        = (shift || ''); # This should probably do something when it fails...
     my $domain_controller = (shift || ''); # This too
 
     my $forest = '';
     my @results = ();
 
     my $ldap_options = '-Q -Y gssapi -b "" -s base "" schemaNamingContext';
-    $krb5ccname = "KRB5CCNAME=$krb5ccname" unless !$krb5ccname;
-    @results = qx($krb5ccname ldapsearch -h $domain_controller $ldap_options);
+    @results = qx(ldapsearch -h $domain_controller $ldap_options);
 
     for my $line (@results) {
         if ($line =~ /^schema/) {
@@ -620,13 +605,17 @@ $krb5conf = construct_krb5_conf(\@KDClist, $kpasswd, $domain, $realm);
 $krb5ccname = generate_tmpfile($cname_template);
 $keytab_file = generate_tmpfile($keytab_template);
 
+
+print "Setting project credentials cache to '$krb5ccname'\n";
+$ENV{KRB5CCNAME} = $krb5ccname;
+
 print "Getting initial credentials via 'kinit'.\n";
-system("kinit $cprinc -c $krb5ccname") == 0
+system("kinit $cprinc") == 0
     or die "system call to 'kinit' failed, can't continue. Error code: $?";
 print "Credentials cached in $krb5ccname\n";
 
 print "Looking for forest name.\n";
-$forest = find_forest( $krb5ccname, $domain_controller );
+$forest = find_forest( $domain_controller );
 if ($forest) {
     print "Forest name = $forest\n";
 }
@@ -647,7 +636,7 @@ else {
 }
 
 print "Looking for site name.\n";
-$site_name = find_site( $krb5ccname, $domain_controller );
+$site_name = find_site( $domain_controller );
 
 if (!$site_name) {
     print "\tSite name not found. Local DCs/GCs will not be discovered.\n";
@@ -706,22 +695,22 @@ if (!@GClist) {
 }
 
 # XXX bad times below
-sleuth_machine_bad_times( $baseDN, $netbios_nodename, $krb5ccname,
+sleuth_machine_bad_times( $baseDN, $netbios_nodename,
                           $domain_controller, $ignore_existing, $modify_existing,
                           $extra_force, $leave, $verbose );
 
 $object_file = generate_tmpfile($object_template);
 
 create_ldap_account( $object_file, $upcase_nodename, $baseDN,
-                     $netbios_nodename, $realm, $krb5ccname, $userAccountControlBASE,
+                     $netbios_nodename, $realm, $userAccountControlBASE,
                      $domain_controller, $modify_existing, $ignore_existing );
 
-$machine_passwd = generate_and_set_passwd( $krb5ccname, $realm, $dryrun,
+$machine_passwd = generate_and_set_passwd( $realm, $dryrun,
                                            $passlen, $minnum, $minlower, $minupper, $minspecial );
 
 print "Finding Key Version Number.\n";
 if (!$dryrun) {
-    $kvno = deduce_kvno( $domain_controller, $baseDN, $upcase_nodename, $krb5ccname );
+    $kvno = deduce_kvno( $domain_controller, $baseDN, $upcase_nodename, );
     print "KVNO: $kvno\n";
 }
 else {
@@ -729,10 +718,10 @@ else {
 }
 
 
-finalize_machine_account( $upcase_nodename, $baseDN, $krb5ccname,
+finalize_machine_account( $upcase_nodename, $baseDN,
                           $userAccountControlBASE, $domain_controller, $dryrun );
 
-@enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN, $krb5ccname, $domain_controller, $dryrun );
+@enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN, $domain_controller, $dryrun );
 
 kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
 
