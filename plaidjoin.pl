@@ -146,10 +146,10 @@ if ($PROGRAM_NAME eq "plaidleave"){
 
 # Finalize the machine account
 sub finalize_machine_account {
+    my $ldap               = (shift or '');
     my $upcase_nodename    = (shift or '');
     my $baseDN             = (shift or '');
     my $userAccountControl = (shift or 0);
-    my $domain_controller  = (shift or '');
     my $dryrun             = (shift or 0);
 
     my @enc_types;
@@ -157,8 +157,7 @@ sub finalize_machine_account {
     $userAccountControl += ($TRUSTED_FOR_DELEGATION + $DONT_EXPIRE_PASSWD);
 
     print "Finding the supported encryption types.\n";
-    @enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN,
-                                   $domain_controller, $dryrun );
+    @enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
     print "Finalizing machine account.\n";
 
@@ -580,7 +579,7 @@ print "Credentials cached in $krb5ccname\n";
 $ldap = gen_ldap_bind( $domain_controller );
 
 print "Looking for forest name.\n";
-$forest = find_forest( $domain_controller );
+$forest = find_forest( $ldap );
 if ($forest) {
     print "Forest name = $forest\n";
 }
@@ -683,8 +682,7 @@ else {
 }
 
 
-finalize_machine_account( $upcase_nodename, $baseDN,
-                          $userAccountControlBASE, $domain_controller, $dryrun );
+finalize_machine_account( $ldap, $upcase_nodename, $baseDN, $userAccountControlBASE, $dryrun );
 
 @enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
