@@ -8,6 +8,7 @@ FindBin::again();
 use lib "$Bin";
 
 use Files;
+use LDAP;
 
 use subs qw(
     deduce_linux_enc_info deduce_solaris_enc_info deduce_and_set_enc_types );
@@ -122,21 +123,20 @@ sub deduce_solaris_enc_info {
 # Sets the encryption type in the ldap object
 # TODO: Write this comment header
 sub deduce_and_set_enc_types {
-    my $upcase_nodename    = (shift or '');
-    my $baseDN             = (shift or '');
-    my $domain_controller  = (shift or '');
-    my $object_file        = (shift or generate_tmpfile("enc_obj.XXXXXX"));
-    my $dryrun             = (shift or 0);
+    my $ldap              = (shift or '');
+    my $upcase_nodename   = (shift or '');
+    my $baseDN            = (shift or '');
+    my $dryrun            = (shift or 0);
 
     my $aes128_supported;
     my $aes256_supported;
-    my $object;
     my $val;
 
     my %enc_info;
     my @enc_types;
 
-    my $ldap_options = qq(-Q -Y gssapi);
+    my $distinct_name = "CN=$upcase_nodename,$baseDN";
+    my $result;
 
     if ($^O eq "linux") {
         %enc_info = deduce_linux_enc_info();
@@ -171,24 +171,16 @@ sub deduce_and_set_enc_types {
         $aes256_supported = 0;
     }
 
-    $object = <<ENDOBJECT;
-dn: CN=$upcase_nodename,$baseDN
-changetype: modify
-replace: msDS-SupportedEncryptionTypes
-msDS-SupportedEncryptionTypes: $val
-ENDOBJECT
-
-    open FH, ">$object_file" or die "Couldn't open $object_file: $!";
-    print FH $object;
-    close FH;
-
     if (!$dryrun) {
-        system(qq(ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
-        if ($? != 0) {
+        $result = ldapreplace( $ldap, $distinct_name, { 'msDS-SupportedEncryptionTypes' => $val } );
+        if ($result->code){
+            warn "Failed to replace entry msDS-SupportedEncryptionTypes: ", $result->error;
+            warn "AES doesn't seem to be supported by the domain controller.\n";
+            # XXX: When I tested this, neither of those encryption types worked
+            warn "Assuming 1DES and Arcfour encryption types.\n";
+
             $aes128_supported = 0;
             $aes256_supported = 0;
-            print "AES doesn't seem to be supported by the domain controller.\n";
-            print "Assuming 1DES and Arcfour encryption types.\n";
         }
     }
 
@@ -199,6 +191,7 @@ ENDOBJECT
     $aes256_supported and print "AES-256 is supported.\n";
 
     # Apparently AD prefers Arcfour, so that comes next
+    # XXX: High chance this statement is wrong, TODO in another branch
     if (${enc_info}{arc4}) {
         push @enc_types, "arcfour-hmac-md5";
         print "Arcfour is supported.\n";

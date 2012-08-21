@@ -37,6 +37,16 @@ use DNS;
 use Kerberos;
 use Encryption;
 use Files;
+use LDAP;
+
+# TODO: Have these replace the scalar variables below
+use constant {
+    ACCOUNTDISABLE            => 2,
+    PASSWD_NOTREQD            => 32,
+    WORKSTATION_TRUST_ACCOUNT => 4096,
+    DONT_EXPIRE_PASSWD        => 65536,
+    TRUSTED_FOR_DELEGATION    => 524288,
+};
 
 my $option_results;
 
@@ -55,7 +65,6 @@ my $encrypt_template="plaidjoin-encryption-object.XXXXXX";
 my $fqdn=hostfqdn();
 my $keytab_template="plaidjoin-krb5keytab.XXXXXX";
 my $kvno=1;
-my $ldap_args="-o authzid= -o mech=gssapi"; # TODO: Verify these are actually correct
 my $minlower = 15;
 my $minnum = 15;
 my $minspecial = 15;
@@ -104,6 +113,7 @@ my $kpasswd='';
 my @KPWlist=();
 my $krb5ccname='';
 my $krb5conf='';
+my $ldap='';
 my $machine_passwd='';
 my $netbios_nodename='';
 my $object_file='';
@@ -125,6 +135,8 @@ END {
         system("kdestroy -q -c $krb5ccname") if $krb5ccname;
         system("rm -f $krb5ccname")          if $krb5ccname;
     }
+    $ldap->unbind unless !$ldap;
+
     $? = $exitval;
 }
 
@@ -139,15 +151,10 @@ sub finalize_machine_account {
     my $userAccountControl = (shift or 0);
     my $domain_controller  = (shift or '');
     my $dryrun             = (shift or 0);
-    my $object_file        = (shift or generate_tmpfile("final_machine_obj.XXXXXX"));
-
-    my $object;
 
     my @enc_types;
 
     $userAccountControl += ($TRUSTED_FOR_DELEGATION + $DONT_EXPIRE_PASSWD);
-
-    my $ldap_options = qq(-Q -Y gssapi);
 
     print "Finding the supported encryption types.\n";
     @enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN,
@@ -155,20 +162,8 @@ sub finalize_machine_account {
 
     print "Finalizing machine account.\n";
 
-    $object = <<ENDOBJECT;
-dn: CN=$upcase_nodename,$baseDN
-changetype: modify
-replace: userAccountControl
-userAccountControl: $userAccountControl
-ENDOBJECT
-
-    open FH, ">$object_file" or die "Couldn't open $object_file: $!";
-    print FH $object;
-    close FH;
-
-    if (!$dryrun) {
-        system(qq(ldapmodify -h "$domain_controller" $ldap_options -f "$object_file"));
-    }
+    ldapreplace($ldap, "CN=$upcase_nodename,$baseDN", { userAccountControl => $userAccountControl })
+        unless $dryrun;
 }
 
 # Deduce the new principal's key version number
@@ -176,21 +171,19 @@ ENDOBJECT
 # Input:
 #   St
 sub deduce_kvno {
-    my $domain_controller = (shift or '');
+    my $ldap              = (shift or '');
     my $baseDN            = (shift or '');
     my $upcase_nodename   = (shift or '');
 
     my $kvno = 1;
 
-    my $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub "cn=$upcase_nodename" msDS-KeyVersionNumber);
-    my @results = qx(ldapsearch -h $domain_controller $ldap_options);
+    my $result = ldapsearch($ldap, $baseDN, 'sub', "cn=$upcase_nodename", ["msDS-KeyVersionNumber"]);
 
-    foreach my $line (@results) {
-        next unless (($kvno = $line) =~ s/^msDS-KeyVersionNumber: (.+)/$1/);
+    foreach my $entry ($result->entries) {
+        next unless ($kvno = $entry->get_value('msDS-KeyVersionNumber'));
 
         last;
     }
-
     chomp $kvno;
 
     return $kvno;
@@ -198,25 +191,21 @@ sub deduce_kvno {
 
 # Creates and adds the ldap machine account
 # Input:
-#   Str : The ldapadd object file name
 #   Str : The uppercased node name
 #   Str : The base distinct name
 #   Str : The netbios nodename
 #   Str : The realm
-#   Str : The file name for the kerberos ticket cache
 #   Num : The UAC Base number
 #   Bool: Whether to modify existing accounts
 #   Bool: Whether to ignore existing accounts
 # Output:
 #   N/A
 sub create_ldap_account {
-    my $object_file            = (shift or generate_tmpfile("ldap_obj.XXXXXX"));
     my $upcase_nodename        = (shift or '');
     my $baseDN                 = (shift or '');
     my $netbios_nodename       = (shift or '');
     my $realm                  = (shift or '');
     my $userAccountControlBASE = (shift or 0);
-    my $domain_controller      = (shift or '');
     my $modify_existing        = (shift or '');
     my $ignore_existing        = (shift or '');
 
@@ -224,54 +213,41 @@ sub create_ldap_account {
     my $userAccountControl = ($userAccountControlBASE + $PASSWD_NOTREQD + $ACCOUNTDISABLE);
     my $userPrincipalName = $fqdn."@".$realm;
 
-    my $ldap_options = qq(-Q -Y gssapi);
-    my $object;
+    my $result;
+
+    my $distinct_name = "CN=$upcase_nodename,$baseDN";
 
     if ($modify_existing) {
-        $object = <<ENDOBJECT;
-dn: CN=$upcase_nodename,$baseDN
-changetype: modify
-replace: servicePrincipalName
-servicePrincipalName: host/$fqdn
--
-replace: userAccountControl
-userAccountControl: $userAccountControl
--
-replace: dNSHostname
-dNSHostname: $fqdn
-ENDOBJECT
-
-        open FH, ">$object_file" or die "Couldn't open $object_file: $!";
-        print FH $object;
-        close FH;
-
         print "A machine account already exists; resetting it.\n";
-        system(qq(ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
-            or die "Could not add the new object to AD: $!";
+        $result = ldapreplace( $ldap, $distinct_name,
+                                {
+                                  servicePrincipalName => "host/$fqdn",
+                                  userAccountControl   => $userAccountControl,
+                                  dNSHostname          => $fqdn,
+                                }
+                             );
+        $result->code and warn "Failed to replace entry servicePrincipalName: ", $result->error;
+
     }
     elsif ($ignore_existing) {
         print "A machine account exists; re-using it.\n";
     }
     else {
-        $object = <<ENDOBJECT;
-dn: CN=$upcase_nodename,$baseDN
-objectClass: computer
-cn: $upcase_nodename
-sAMAccountName: $netbios_nodename
-userPrincipalName: host/$userPrincipalName
-servicePrincipalName: host/$fqdn
-userAccountControl: $userAccountControl
-dNSHostname: $fqdn
-ENDOBJECT
-
-        open FH, ">$object_file" or die "Couldn't open $object_file: $!";
-        print FH $object;
-        close FH;
-
         print "Creating the machine account in AD via LDAP.\n";
 
-        system(qq(ldapadd -h $domain_controller $ldap_options -f "$object_file")) == 0
-            or die "Could not add the new object to AD: $!";
+        $result = ldapadd( $ldap, $distinct_name,
+                            {
+                                dn                   => $distinct_name,
+                                objectClass          => "computer",
+                                cn                   => $upcase_nodename,
+                                sAMAccountName       => $netbios_nodename,
+                                userPrincipalName    => "host/$userPrincipalName",
+                                servicePrincipalName => "host/$fqdn",
+                                userAccountControl   => $userAccountControl,
+                                dNSHostname          => $fqdn,
+                            }
+                        );
+        $result->code and die "Failed to add new object to AD: $!", $result->error;
     }
 }
 
@@ -312,31 +288,25 @@ sub correct_idmap {
 # Output
 #   ????????
 sub sleuth_machine_bad_times {
+    my $ldap              = (shift or '');
     my $baseDN            = (shift or '');
     my $netbios_nodename  = (shift or '');
-    my $domain_controller = (shift or '');
     my $ignore_existing   = (shift or 0);
     my $modify_existing   = (shift or 0);
     my $extra_force       = (shift or 0);
     my $leave             = (shift or 0);
     my $verbose           = (shift or 0);
 
-    my $distinct_name = '';
+    my $distinct_name;
+    my $entry_dn;
 
-    my $ldap_options = '';
-    my @results = ();
+    my $result;
 
     if (!$dryrun) {
         print "Checking for an existing account.\n";
-        $ldap_options = qq(-Q -Y gssapi -b "$baseDN" -s sub sAMAccountName="$netbios_nodename" dn);
-        @results = qx(ldapsearch -h $domain_controller $ldap_options);
 
-        for my $answer (@results) {
-            next unless ($answer =~ s/^dn: (.+)/$1/);
-
-            $distinct_name = $1;
-            last;
-        }
+        $result = ldapsearch( $ldap, $baseDN, 'sub', "sAMAccountName=$netbios_nodename", ['dn'] );
+        $distinct_name = $result->entry(0)->dn;
     }
 
     if (!$distinct_name) {
@@ -348,17 +318,21 @@ sub sleuth_machine_bad_times {
     if ( (!$ignore_existing eq !0) and (!$modify_existing eq !0) and $distinct_name ) {
         print "Inspecting machine account for other objects.\n";
 
-        $ldap_options = qq(-Q -Y gssapi -b "$distinct_name" -s sub "" dn);
-        @results = qx(ldapsearch -h $domain_controller $ldap_options);
-        for my $answer (@results) {
-            next unless (($answer =~ s/^dn: (.+)/$1/) and ($distinct_name ne $answer));
+        $result = ldapsearch( $ldap, $distinct_name, 'sub', undef, ['dn'] );
+        foreach my $entry ($result->entries) {
 
-            $answer =~ /$distinct_name(.*)/;
+                # If we only get one reply, then there are no other objects in the machine account.
+                last if ($result->count eq 1);
+
+            next unless (($entry_dn = $entry->dn) and ($distinct_name ne $entry_dn));
+
+            $entry_dn =~ /$distinct_name(.*)/;
             my $sub_dn = $1;
 
             if ($extra_force) {
                 print "Deleting the following object: $sub_dn\n";
-                system(qq(ldapdelete -h "$domain_controller" $ldap_options "$answer"));
+                # TODO: Check the return value on this function/decide what should happen if it fails
+                ldapdelete( $ldap, $entry_dn );
             }
             else {
                 print "The following object must be deleted (use -f -f, -r or -i): $sub_dn\n";
@@ -367,7 +341,8 @@ sub sleuth_machine_bad_times {
 
         if ($force or $leave) {
             print "Deleting existing machine account.\n";
-            system(qq(ldapdelete -h "$domain_controller" $ldap_options "$distinct_name"));
+            # TODO: Check the return value on this function/decide what should happen if it fails
+            ldapdelete( $ldap, $distinct_name );
         }
         elsif (!$modify_existing or !$ignore_existing) {
             warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
@@ -389,58 +364,49 @@ sub sleuth_machine_bad_times {
 #          or 'siteName's, so I have no way of testing this code. I'm translating
 #          this as best I can, but I make no promises on its veracity
 # Input:
-#   Str: The location of the Kerberos Ticket cache file
-#   Str: The domain controller to connect to
+#   Scalar: The LDAP object to search with
 # Output:
 #   Str: The found site value
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_site {
-    my $domain_controller = (shift || ''); # This too
+    my $ldap = (shift or '');
 
-    my $site_name      = '';
-    my $subnet_domain = '';
-    my $ldapsrv       = '';
+    my $site_name;
+    my $subnet_domain;
+    my $ldapsrv;
+    my $site_ldap;
 
-    my @results      = ();
-    my @more_results = ();
-    my $ldap_options = '-Q -Y gssapi -b "" -s sub';
-    my $more_ldap_opts = '';
+    my $result;
+    my $site_result;
 
+    print "\tLooking for subnet objects in the global catalog.\n";
     my @subnets = enumerate_subnets();
     SUBNET:
     for my $subnet (@subnets) {
+        print "\tLooking for subnet objects in its domain.\n";
 
-        print "\tLooking for subnet object in the global catalog.\n";
-        @results = qx(ldapsearch -h $domain_controller $ldap_options cn=$subnet dn);
+        $result = ldapsearch( $ldap, '', 'sub', "cn=$subnet", ['dn'] );
+        ENTRY:
+        foreach my $entry ($result->entries) {
+            $subnet_domain = dn_to_dns($entry->dn);
+            next ENTRY unless ($ldapsrv = canonical_resolve("DomainDnsZones.$subnet_domain"));
 
-        LINE:
-        for my $line (@results) {
-
-            # This fixes $line, but if it doesn't match (i.e. we have a line
-            # we don't want to use) it will skip to the next line
-            next LINE unless ($line =~ s/^dn (.+)/$1/);
-
-            print "\tLooking for subnet objects in its domain.\n";
-            $subnet_domain = dn_to_dns($line);
-            $ldapsrv = canonical_resolve("DomainDnsZones.$subnet_domain");
-
-            $more_ldap_opts = "-Q -Y gssapi -b \"$line\" -s base \"\" siteObject";
-            @more_results = qx(ldapsearch -h $ldapsrv $ldap_options);
+            $site_ldap = gen_ldap_bind( $ldapsrv );
+            $site_result = ldapsearch( $site_ldap, $entry->dn, 'base', undef, ['siteObject'] );
+            $site_ldap->unbind;
 
             SITEDN:
-            for my $line (@more_results) {
+            foreach my $site_entry ($site_result->entries) {
 
-                # This fixes $line, but if it doesn't match (i.e. we have a line
-                # we don't want to use) it will skip to the next line
-                next SITEDN unless ($line =~ s/^siteObject CN=(.+),.*/$1/);
+                $site_name = $site_entry->get_value( "siteObject" );
+                next SITEDN unless ($site_name =~ s/CN=(.+),.*/$1/);
 
-                # Found it; store it and exit the loops
-                $site_name = $line;
                 last SUBNET;
             }
         }
     }
+
     return $site_name;
 }
 
@@ -449,26 +415,23 @@ sub find_site {
 #       It would be really nice to know.
 # Input:
 #   Str: The location of the Kerberos Ticket cache file
-#   Str: The domain controller to connect to
 # Output:
 #   Str: The found forest value
 #   OR
 #   '' : Nothing was found; the empty string is returned
 sub find_forest {
-    my $domain_controller = (shift || ''); # This too
+    my $ldap = (shift or '');
 
     my $forest = '';
-    my @results = ();
+    my $result;
 
-    my $ldap_options = '-Q -Y gssapi -b "" -s base "" schemaNamingContext';
-    @results = qx(ldapsearch -h $domain_controller $ldap_options);
-
-    for my $line (@results) {
-        if ($line =~ /^schema/) {
-            $line =~ s/^\w+: CN=\w+,CN=\w+,//;
-            $forest = dn_to_dns($line);
-        }
+    $result = ldapsearch( $ldap, undef, 'base', undef, ['schemaNamingContext'] );
+    foreach my $entry ($result->entries) {
+        my $naming_context = ($entry->get_value("schemaNamingContext") =~ /^CN=\w+,CN=\w+,(.*)/);
+        $forest = dn_to_dns( $naming_context );
+        last;
     }
+
     return $forest;
 }
 
@@ -614,6 +577,8 @@ system("kinit $cprinc") == 0
     or die "system call to 'kinit' failed, can't continue. Error code: $?";
 print "Credentials cached in $krb5ccname\n";
 
+$ldap = gen_ldap_bind( $domain_controller );
+
 print "Looking for forest name.\n";
 $forest = find_forest( $domain_controller );
 if ($forest) {
@@ -636,7 +601,7 @@ else {
 }
 
 print "Looking for site name.\n";
-$site_name = find_site( $domain_controller );
+$site_name = find_site( $ldap );
 
 if (!$site_name) {
     print "\tSite name not found. Local DCs/GCs will not be discovered.\n";
@@ -695,22 +660,22 @@ if (!@GClist) {
 }
 
 # XXX bad times below
-sleuth_machine_bad_times( $baseDN, $netbios_nodename,
-                          $domain_controller, $ignore_existing, $modify_existing,
+sleuth_machine_bad_times( $ldap, $baseDN, $netbios_nodename,
+                          $ignore_existing, $modify_existing,
                           $extra_force, $leave, $verbose );
 
 $object_file = generate_tmpfile($object_template);
 
-create_ldap_account( $object_file, $upcase_nodename, $baseDN,
+create_ldap_account( $upcase_nodename, $baseDN,
                      $netbios_nodename, $realm, $userAccountControlBASE,
-                     $domain_controller, $modify_existing, $ignore_existing );
+                     $modify_existing, $ignore_existing );
 
 $machine_passwd = generate_and_set_passwd( $realm, $dryrun,
                                            $passlen, $minnum, $minlower, $minupper, $minspecial );
 
 print "Finding Key Version Number.\n";
 if (!$dryrun) {
-    $kvno = deduce_kvno( $domain_controller, $baseDN, $upcase_nodename, );
+    $kvno = deduce_kvno( $ldap, $baseDN, $upcase_nodename, );
     print "KVNO: $kvno\n";
 }
 else {
@@ -721,7 +686,7 @@ else {
 finalize_machine_account( $upcase_nodename, $baseDN,
                           $userAccountControlBASE, $domain_controller, $dryrun );
 
-@enc_types = deduce_and_set_enc_types( $upcase_nodename, $baseDN, $domain_controller, $dryrun );
+@enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
 kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
 
