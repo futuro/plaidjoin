@@ -103,7 +103,7 @@ sub ldapreplace {
 
     return $result unless ($ldap and $dn and $attr_ref);
 
-    $result = $ldap->modify( $dn, replace => %{$attr_ref} );
+    $result = $ldap->modify( $dn, replace => { %{$attr_ref} } );
 
     return $result;
 }
