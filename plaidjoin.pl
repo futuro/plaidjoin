@@ -683,6 +683,9 @@ else {
 
 finalize_machine_account( $ldap, $upcase_nodename, $baseDN, $userAccountControlBASE, $dryrun );
 
+# TODO: This should be called before finalize_machine_account() is called, and then have its value
+#       passed in to finalize_machine_account(). That way it's not happening more than once for
+#       no good reason.
 @enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
 kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
