@@ -4,7 +4,6 @@ Dependencies:
 
 * ksetpass                       : From kadmin-remctl project
 * kinit/kdestroy/ktutil          : From krb5-user
-* rm                             : Standard rm command
 * ifconfig                       : net-tools (on linux, not sure about elsewhere)
 
 * Linux Specific:

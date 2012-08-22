@@ -133,7 +133,7 @@ END {
     if ( $krb5ccname =~ m:/tmp/\w+:) {
         # We don't care whether these succeed or not
         system("kdestroy -q -c $krb5ccname") if $krb5ccname;
-        system("rm -f $krb5ccname")          if $krb5ccname;
+        unlink $krb5ccname                   if $krb5ccname;
     }
     $ldap->unbind unless !$ldap;
 
