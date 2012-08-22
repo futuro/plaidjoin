@@ -236,7 +236,6 @@ sub create_ldap_account {
 
         $result = ldapadd( $ldap, $distinct_name,
                             {
-                                dn                   => $distinct_name,
                                 objectClass          => "computer",
                                 cn                   => $upcase_nodename,
                                 sAMAccountName       => $netbios_nodename,
@@ -305,7 +304,7 @@ sub sleuth_machine_bad_times {
         print "Checking for an existing account.\n";
 
         $result = ldapsearch( $ldap, $baseDN, 'sub', "sAMAccountName=$netbios_nodename", ['dn'] );
-        $distinct_name = $result->entry(0)->dn;
+        $distinct_name = $result->entry(0)->dn if $result->entry(0);
     }
 
     if (!$distinct_name) {

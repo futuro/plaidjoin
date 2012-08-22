@@ -40,7 +40,7 @@ sub gen_ldap_bind {
     $sasl = Authen::SASL->new( mechanism => $mechanism, );
     $ldap = Net::LDAP->new(
             $host,
-            onerror => 'die' ,
+            onerror => 'warn' ,
         ) or die "Cannot connect to LDAP host '$host': ";
         # NOTE: Is this second die call redundant if 'onerror' is set to 'die'?
 
@@ -121,7 +121,7 @@ sub ldapadd {
 
     return $result unless ($ldap and $dn and $attr_ref);
 
-    $result = $ldap->add( $dn, add => %{$attr_ref} );
+    $result = $ldap->add( $dn, attrs => [ %{$attr_ref} ] );
 
     return $result;
 }
