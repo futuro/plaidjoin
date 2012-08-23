@@ -2,11 +2,19 @@
 
 Dependencies:
 
-* General system programs
+* General system dependencies
     * ksetpass                       : From kadmin-remctl project
     * kinit/kdestroy/ktutil          : From krb5-user
     * rm                             : Standard rm command
     * ifconfig                       : net-tools (on linux, not sure about elsewhere)
+
+* Linux specific dependencies
+    * lsmod
+
+* Solaris specific dependencies
+    * encrypt
+    * svcs
+    * svcadm
 
 * Perl Modules
     * Authen::SASL
@@ -21,14 +29,6 @@ Dependencies:
     * Net::LDAP
     * Pod::Usage
     * String::MkPasswd
-
-* Linux Specific:
-    * lsmod
-
-* Solaris Specific:
-    * encrypt
-    * svcs
-    * svcadm
 
 Acknowledgements:
     This would have been vastly more difficult without the tangential
