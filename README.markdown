@@ -30,10 +30,11 @@ Dependencies:
     * Pod::Usage
     * String::MkPasswd
 
-Acknowledgements:
-    This would have been vastly more difficult without the tangential
-    assistance of Nico Williams and Baban Kenkre, through their work on
-    adjoin.sh.
+Acknowledgements:  
+
+        This would have been vastly more difficult without the tangential  
+        assistance of Nico Williams and Baban Kenkre, through their work on  
+        adjoin.sh.
 
 
 vim: et ts=4 sw=4 tw=75
