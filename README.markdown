@@ -2,10 +2,25 @@
 
 Dependencies:
 
-* ksetpass                       : From kadmin-remctl project
-* kinit/kdestroy/ktutil          : From krb5-user
-* rm                             : Standard rm command
-* ifconfig                       : net-tools (on linux, not sure about elsewhere)
+* General system programs
+    * ksetpass                       : From kadmin-remctl project
+    * kinit/kdestroy/ktutil          : From krb5-user
+    * rm                             : Standard rm command
+    * ifconfig                       : net-tools (on linux, not sure about elsewhere)
+
+* Perl Modules
+    * Authen::SASL
+    * English
+    * Expect
+    * File::Copy
+    * File::Temp
+    * FindBin
+    * Getopt::Long
+    * Net::DNS
+    * Net::Domain
+    * Net::LDAP
+    * Pod::Usage
+    * String::MkPasswd
 
 * Linux Specific:
     * lsmod

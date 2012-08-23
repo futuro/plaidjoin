@@ -22,7 +22,6 @@ use warnings;
 
 use sigtrap qw(die INT QUIT);
 
-use Carp;
 use English;
 
 use FindBin qw($Bin);
