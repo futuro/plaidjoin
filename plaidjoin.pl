@@ -84,7 +84,7 @@ my $dryrun=''; # TODO: There should be a wrapper function to enable dryrun funct
 my $extra_force='';
 my $force='';
 my $ignore_existing='';
-my $leave='';
+my $part='';
 my $modify_existing='';
 my $verbose='';
 
@@ -139,8 +139,8 @@ END {
     $? = $exitval;
 }
 
-if ($PROGRAM_NAME eq "plaidleave"){
-    $leave=1;
+if ($PROGRAM_NAME eq "plaidpart"){
+    $part=1;
 }
 
 # Finalize the machine account
@@ -248,108 +248,52 @@ sub create_ldap_account {
     }
 }
 
-# Do some OpenSolaris configuration stuff
-# XXX XXX: I don't have access to an OpenSolaris box, so I make no assurances that this
-#          code works, or does anything, or doesn't do every possible bad thing.
-#          Use at your own risk.
+# Deduce whether there is an existing machine account and do something (or don't) about it.
 # Input:
-#   N/A
-# Output:
-#   1: Success (always)
-sub correct_idmap {
-    my $dryrun = (shift or 0);
-    my $leave  = (shift or 0);
-
-    system("svcs -l svc:/system/idmap >/dev/null 2>/dev/null");
-    # SNV/OpenSolaris
-    if ($? == 0) {
-        if ($leave) {
-            system("svcadm disable -s svc:/system/idmap") unless $dryrun;
-        }
-        else {
-            system("svcadm disable -ts svc:/system/idmap") unless $dryrun;
-            system("svcadm enable -t svc:/system/idmap") unless $dryrun;
-        }
-    }
-
-    return 1;
-}
-
-# Deduce whether there is an existing machine account
-# NOTE: I created this function to help try and control some of the wild growth in adjoin.sh.
-#       This function is un good, and I'm not 100% certain how I want to ultimately deal
-#       with this code. So, I did the rough equivalent of sweeping it under the rug. It's still
-#       a problem, and I've named it so it should stick out.
-# Input:
-#   I dunno lol.
+#   Scalar: The LDAP object to use for ldap operations
+#   Scalar: The base distinguished name to base off of
+#   Scalar: The netbios nodename for the machine
+#   Scalar: Whether we're ignoring existing objects
+#   Scalar: Whether we're modifying existing objects
+#   Scalar: Whether we're parting the domain
 # Output
-#   ????????
-sub sleuth_machine_bad_times {
-    my $ldap              = (shift or '');
-    my $baseDN            = (shift or '');
-    my $netbios_nodename  = (shift or '');
-    my $ignore_existing   = (shift or 0);
-    my $modify_existing   = (shift or 0);
-    my $extra_force       = (shift or 0);
-    my $leave             = (shift or 0);
-    my $verbose           = (shift or 0);
+#   N/A
+sub handle_preexisting_object {
+    my $ldap            = (shift or '');
+    my $baseDN          = (shift or '');
+    my $upcase_nodename = (shift or '');
+    my $ignore_existing = (shift or 0);
+    my $modify_existing = (shift or 0);
+    my $part            = (shift or 0);
 
     my $distinct_name;
-    my $entry_dn;
-
     my $result;
 
-    if (!$dryrun) {
-        print "Checking for an existing account.\n";
+    print "Checking for pre-existing machine account.\n";
 
-        $result = ldapsearch( $ldap, $baseDN, 'sub', "sAMAccountName=$netbios_nodename", ['dn'] );
-        $distinct_name = $result->entry(0)->dn if $result->entry(0);
+    if ($dryrun) {
+        print "In a dry-run, no work done.\n";
+        return 1;
     }
 
-    if (!$distinct_name) {
-        $ignore_existing = 0;
-        $modify_existing = 0;
-    }
+    $result = ldapsearch( $ldap, $baseDN, 'sub', "cn=$upcase_nodename", ['dn'] );
+    $distinct_name = $result->entry(0)->dn if $result->entry(0);
 
-    # If $ignore_existing is false and $modify_existing is false and $distinct_name exists
-    if ( (!$ignore_existing eq !0) and (!$modify_existing eq !0) and $distinct_name ) {
-        print "Inspecting machine account for other objects.\n";
-
-        $result = ldapsearch( $ldap, $distinct_name, 'sub', undef, ['dn'] );
-        foreach my $entry ($result->entries) {
-
-                # If we only get one reply, then there are no other objects in the machine account.
-                last if ($result->count eq 1);
-
-            next unless (($entry_dn = $entry->dn) and ($distinct_name ne $entry_dn));
-
-            $entry_dn =~ /$distinct_name(.*)/;
-            my $sub_dn = $1;
-
-            if ($extra_force) {
-                print "Deleting the following object: $sub_dn\n";
-                # TODO: Check the return value on this function/decide what should happen if it fails
-                ldapdelete( $ldap, $entry_dn );
-            }
-            else {
-                print "The following object must be deleted (use -f -f, -r or -i): $sub_dn\n";
-            }
-        }
-
-        if ($force or $leave) {
+    if ($distinct_name and !$ignore_existing) {
+        if ($modify_existing and ($force or $part)) {
             print "Deleting existing machine account.\n";
-            # TODO: Check the return value on this function/decide what should happen if it fails
+            # TODO Something should happen if ldapdelete fails
             ldapdelete( $ldap, $distinct_name );
         }
-        elsif (!$modify_existing or !$ignore_existing) {
+        else {
             warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
             exit 1;
         }
     }
 
-    if ($leave) {
-        correct_idmap(); # This is specifically for SNV/OpenSolaris
+    if ($part) {
         my $base = ($0 =~ m|\./(.*)+|);
+        print "Machine succesfully parted from domain.\n";
         print "$base: Done\n";
         exit 0;
     }
@@ -656,10 +600,9 @@ if (!@GClist) {
     exit 1;
 }
 
-# XXX bad times below
-sleuth_machine_bad_times( $ldap, $baseDN, $netbios_nodename,
+handle_preexisting_object( $ldap, $baseDN, $upcase_nodename,
                           $ignore_existing, $modify_existing,
-                          $extra_force, $leave, $verbose );
+                          $part, );
 
 $object_file = generate_tmpfile($object_template);
 
@@ -701,10 +644,6 @@ Fiddle with and install as necessary.
 EOF
 }
 
-if ($^O eq 'solaris') {
-    correct_idmap( $dryrun, $leave );
-}
-
 print "The machine is now joined to the domain, rejoice!\n";
 
 exit 0;
@@ -718,7 +657,7 @@ plaidjoin - Join or Disjoin a computer from the domain.
 =head1 SYNOPSIS
 
 Usage: plaidjoin  [options] [domain [nodename]]
-Usage: plaidleave [options] [domain [nodename]]
+Usage: plaidpart [options] [domain [nodename]]
 
 Joins or leaves an Active Directory domain.  This includes:
 
