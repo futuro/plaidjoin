@@ -208,11 +208,11 @@ sub create_ldap_account {
 
     my $result;
 
-    my $distinct_name = "CN=$upcase_nodename,$baseDN";
+    my $distinguished_name = "CN=$upcase_nodename,$baseDN";
 
     if ($modify_existing) {
         print "A machine account already exists; resetting it.\n";
-        $result = ldapreplace( $ldap, $distinct_name,
+        $result = ldapreplace( $ldap, $distinguished_name,
                                 {
                                   servicePrincipalName => "host/$fqdn",
                                   userAccountControl   => $userAccountControl,
@@ -228,7 +228,7 @@ sub create_ldap_account {
     else {
         print "Creating the machine account in AD via LDAP.\n";
 
-        $result = ldapadd( $ldap, $distinct_name,
+        $result = ldapadd( $ldap, $distinguished_name,
                             {
                                 objectClass          => "computer",
                                 cn                   => $upcase_nodename,
@@ -261,7 +261,7 @@ sub handle_preexisting_object {
     my $modify_existing = (shift or 0);
     my $leave_domain    = (shift or 0);
 
-    my $distinct_name;
+    my $distinguished_name;
     my $result;
 
     print "Checking for pre-existing machine account.\n";
@@ -272,13 +272,13 @@ sub handle_preexisting_object {
     }
 
     $result = ldapsearch( $ldap, $baseDN, 'sub', "cn=$upcase_nodename", ['dn'] );
-    $distinct_name = $result->entry(0)->dn if $result->entry(0);
+    $distinguished_name = $result->entry(0)->dn if $result->entry(0);
 
-    if ($distinct_name and !$ignore_existing) {
+    if ($distinguished_name and !$ignore_existing) {
         if ($modify_existing and ($force or $leave_domain)) {
             print "Deleting existing machine account.\n";
             # TODO Something should happen if ldapdelete fails
-            ldapdelete( $ldap, $distinct_name );
+            ldapdelete( $ldap, $distinguished_name );
         }
         else {
             warn "A machine account already exists. Try -i, -r or -f (see usage). Quitting.\n";
