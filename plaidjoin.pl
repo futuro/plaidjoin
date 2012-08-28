@@ -151,12 +151,7 @@ sub finalize_machine_account {
     my $userAccountControl = (shift or 0);
     my $dryrun             = (shift or 0);
 
-    my @enc_types;
-
     $userAccountControl += ($TRUSTED_FOR_DELEGATION + $DONT_EXPIRE_PASSWD);
-
-    print "Finding the supported encryption types.\n";
-    @enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
     print "Finalizing machine account.\n";
 
@@ -355,7 +350,7 @@ sub find_site {
 # NOTE: I'm not sure if this is ever different from the '$domain' value passed in or discovered.
 #       It would be really nice to know.
 # Input:
-#   Str: The location of the Kerberos Ticket cache file
+#   Scalar: The LDAP object to use for LDAP operations
 # Output:
 #   Str: The found forest value
 #   OR
@@ -619,16 +614,13 @@ if (!$dryrun) {
     print "KVNO: $kvno\n";
 }
 else {
-    print "Dryrun: KVNO is probably '$kvno'\n";
+    print "Dryrun: assuming KVNO is default '$kvno'\n";
 }
 
+print "Finding the supported encryption types.\n";
+@enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
 finalize_machine_account( $ldap, $upcase_nodename, $baseDN, $userAccountControlBASE, $dryrun );
-
-# TODO: This should be called before finalize_machine_account() is called, and then have its value
-#       passed in to finalize_machine_account(). That way it's not happening more than once for
-#       no good reason.
-@enc_types = deduce_and_set_enc_types( $ldap, $upcase_nodename, $baseDN, $dryrun );
 
 kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
 
