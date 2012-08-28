@@ -3,7 +3,6 @@ package Kerberos;
 use strict;
 use warnings;
 
-use Expect           qw();
 use Net::Domain      qw(hostfqdn);
 use String::MkPasswd qw(mkpasswd);
 use File::Copy       qw(cp);
@@ -205,41 +204,33 @@ sub setup_krb_files {
 # Output:
 #   N/A
 sub kt_write {
-    my $password  = (shift or '');
-    my $fqdn      = (shift or '');
-    my $realm     = (shift or '');
-    my $kvno      = (shift or 1);
-    my $keytab    = (shift or 'plaidjoin.keytab');
-    my @enc_types = @{(shift or [])};
+    my $password   = (shift or '');
+    my $fqdn       = (shift or '');
+    my $realm      = (shift or '');
+    my $kvno       = (shift or 1);
+    my $keytab     = (shift or '/tmp/plaidjoin.keytab');
+    my $hostccname = (shift or 'FILE:/tmp/plaidjoin.hostcc');
 
-    my $host_principal = $fqdn."@".$realm;
+    my $host_principal = "host/".$fqdn."@".$realm;
 
-    my $spawn_ok;
-    my $timeout = 10;
+    # TODO: This seems like the wrong place to have this. I should think some more about having a
+    # 'kinit' function that will handle this context initiation, along with the getting creds
+    # from the user (not the host creds, mind you).
+    my $krb5con = Authen::Krb5::init_context();
+    my $cprinc = Authen::Krb5::parse_name( $host_principal );
+    my $ccache = Authen::Krb5::cc_resolve( $hostccname );
 
-    my $ktutil = Expect->spawn("ktutil")
-        or die "Cannot spawn ktutil: $!";
+    # Get the initial TGT for the host using the password
+    my $creds = Authen::Krb5::get_init_creds_password( $cprinc, $password );
+    Authen::Krb5::Ccache::initialize( $ccache, $cprinc );
+    $ccache->store_cred($creds);
 
-    foreach my $encryption_type (@enc_types) {
-        unless ($ktutil->expect($timeout, 'ktutil:')){
-            die "ERROR: Can't talk to ktutil, dying.";
-        }
-        $spawn_ok = 1;
-        $ktutil->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
+    # Write out the keytab for the stored credentials
+    my $ktab = Authen::Krb5::kt_resolve( $keytab );
+    my $ktentry = Authen::Krb5::KeytableEntry->new( $cprinc, $kvno, $creds->keyblock() );
+    $ktab->add_entry( $ktentry );
 
-        unless ($ktutil->expect($timeout, 'Password for host')){
-            die "ERROR: Can't talk to ktutil, dying.";
-        }
-        $ktutil->send("$password\n");
-    }
-
-    unless ($ktutil->expect($timeout, 'ktutil:')){
-        die "ERROR: Couldn't write keytab file before losing connection to ktutil; dying.";
-    }
-    $ktutil->send("write_kt $keytab\n");
-    $ktutil->send("quit\n");
-    $ktutil->soft_close();
-
+    Authen::Krb5::free_context( $krb5con );
 }
 
 1;
