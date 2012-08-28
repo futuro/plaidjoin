@@ -84,7 +84,7 @@ my $dryrun=''; # TODO: There should be a wrapper function to enable dryrun funct
 my $extra_force='';
 my $force='';
 my $ignore_existing='';
-my $part='';
+my $leave_domain='';
 my $modify_existing='';
 my $verbose='';
 
@@ -140,7 +140,7 @@ END {
 }
 
 if ($PROGRAM_NAME eq "plaidpart"){
-    $part=1;
+    $leave_domain=1;
 }
 
 # Finalize the machine account
@@ -264,7 +264,7 @@ sub handle_preexisting_object {
     my $upcase_nodename = (shift or '');
     my $ignore_existing = (shift or 0);
     my $modify_existing = (shift or 0);
-    my $part            = (shift or 0);
+    my $leave_domain    = (shift or 0);
 
     my $distinct_name;
     my $result;
@@ -280,7 +280,7 @@ sub handle_preexisting_object {
     $distinct_name = $result->entry(0)->dn if $result->entry(0);
 
     if ($distinct_name and !$ignore_existing) {
-        if ($modify_existing and ($force or $part)) {
+        if ($modify_existing and ($force or $leave_domain)) {
             print "Deleting existing machine account.\n";
             # TODO Something should happen if ldapdelete fails
             ldapdelete( $ldap, $distinct_name );
@@ -291,7 +291,7 @@ sub handle_preexisting_object {
         }
     }
 
-    if ($part) {
+    if ($leave_domain) {
         my $base = ($0 =~ m|\./(.*)+|);
         print "Machine succesfully parted from domain.\n";
         print "$base: Done\n";
@@ -602,7 +602,7 @@ if (!@GClist) {
 
 handle_preexisting_object( $ldap, $baseDN, $upcase_nodename,
                           $ignore_existing, $modify_existing,
-                          $part, );
+                          $leave_domain, );
 
 $object_file = generate_tmpfile($object_template);
 
