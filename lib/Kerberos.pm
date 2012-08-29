@@ -244,11 +244,11 @@ sub kinit {
     my $princname = (shift or '');
     my $ccname    = (shift or 'FILE:/tmp/plaidjoin.hostcc');
 
-    my $princ = Authen::Krb5::parse_name( $princname )
-        or die "Couldn't generate principal object from '$princname'; dying. $!";
-
     Authen::Krb5::init_context()
         or die "Couldn't initialize Kerberos context; dying. $!";
+
+    my $princ = Authen::Krb5::parse_name( $princname )
+        or die "Couldn't generate principal object from '$princname'; dying. $!";
 
     my $creds = get_creds_with_passwd( $princname );
 
