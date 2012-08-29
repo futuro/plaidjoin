@@ -9,7 +9,8 @@ use File::Copy       qw(cp);
 use File::Temp       qw(tempfile);
 
 use subs qw(
-    setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
+    setup_krb_files kinit kt_write generate_and_set_passwd construct_krb5_conf
+    get_creds_with_passwd );
 
 BEGIN {
     require Exporter;
@@ -19,8 +20,10 @@ BEGIN {
 
     # Functions and variables which are exported by default
     our @EXPORT =qw(
-        setup_krb_files kt_write generate_and_set_passwd construct_krb5_conf );
+        setup_krb_files kinit kt_write generate_and_set_passwd construct_krb5_conf );
 }
+
+my $def_ktab = '/tmp/plaidjoin.keytab';
 
 # Construct the contents of the new krb5.conf file, write them into a temp file,
 # then return that file name.
@@ -193,14 +196,78 @@ sub setup_krb_files {
     }
 }
 
+sub get_creds_with_ktab {
+    my $princname = (shift or '');
+    my $ktabname  = (shift or $def_ktab);
+}
+
+# Get and return initial credentials for '$princname', using either '$passwd' or STDIN
+# Input:
+#   Scalar: The principal name to get the credentials for
+#   Scalar: The password to use (optional)
+# Output:
+#   Scalar: The object representation of the credentials
+sub get_creds_with_passwd {
+    my $princname = (shift or '');
+    my $passwd    = (shift or '');
+
+    my $princ = Authen::Krb5::parse_name( $princname )
+        or die "Couldn't generate principal object from '$princname'; dying. $!";
+
+    if (!$passwd) {
+        # Get the password from the user
+        print "Getting initial TGT for '".$princ->data."@".$princ->realm."'\n";
+        print "Please enter your password: ";
+        ReadMode('noecho');
+        $passwd = ReadLine(0);
+        chomp $passwd;
+        ReadMode('restore');
+        print "\n";
+        not defined $passwd and die "Couldn't retrieve password from user; dying. $!";
+    }
+
+    # Get the initial credentials
+    my $creds = Authen::Krb5::get_init_creds_password($princ, $passwd)
+        or die "Couldn't get the initial credentials for '$princname'; dying. $!";
+    undef $passwd; # Clear the password so we're not storing sensitive plaintext data in memory
+
+    return $creds;
+}
+
+# Initialize the Kerberos context and cache a TGT for the principal
+# Input:
+#   Scalar: The principal name to get a TGT for
+#   Scalar: The location of the Credentials Cache
+sub kinit {
+    my $princname = (shift or '');
+    my $ccname    = (shift or 'FILE:/tmp/plaidjoin.hostcc');
+
+    my $princ = Authen::Krb5::parse_name( $princname )
+        or die "Couldn't generate principal object from '$princname'; dying. $!";
+
+    Authen::Krb5::init_context()
+        or die "Couldn't initialize Kerberos context; dying. $!";
+
+    my $creds = get_creds_with_passwd( $princname );
+
+    # Store those creds in $ccname
+    my $ccache = Authen::Krb5::cc_resolve( $ccname )
+        or die "Couldn't resolve initial credential cache '$ccname'; dying. $!";
+    Authen::Krb5::Ccache::initialize($ccache, $princ)
+        or die "Couldn't initialialize credentials cache '$ccache' for '$princ'; dying. $!";
+    $ccache->store_cred($creds)
+        or die "Couldn't store initial credentials in '$ccname'; dying. $!";
+
+    return 1;
+}
+
 # Create a keytab file for the machine account
 # Input:
-#   Str        : The password for the machine account
-#   Str        : the fqdn for the machine
-#   Str        : the realm for the machine
-#   Num        : the kvno for the machine
-#   Str        : The keytab filename for the machine (default  : plaidjoin.keytab)
-#   Ref[Array] : A reference to the array of encryption types.
+#   Str : The password for the machine account
+#   Str : the fqdn for the machine
+#   Str : the realm for the machine
+#   Num : the kvno for the machine
+#   Str : The keytab filename for the machine
 # Output:
 #   N/A
 sub kt_write {
@@ -208,7 +275,7 @@ sub kt_write {
     my $fqdn       = (shift or '');
     my $realm      = (shift or '');
     my $kvno       = (shift or 1);
-    my $keytab     = (shift or '/tmp/plaidjoin.keytab');
+    my $keytab     = (shift or $def_ktab);
     my $hostccname = (shift or 'FILE:/tmp/plaidjoin.hostcc');
 
     my $host_principal = "host/".$fqdn."@".$realm;
@@ -216,12 +283,11 @@ sub kt_write {
     # TODO: This seems like the wrong place to have this. I should think some more about having a
     # 'kinit' function that will handle this context initiation, along with the getting creds
     # from the user (not the host creds, mind you).
-    my $krb5con = Authen::Krb5::init_context();
     my $cprinc = Authen::Krb5::parse_name( $host_principal );
     my $ccache = Authen::Krb5::cc_resolve( $hostccname );
 
     # Get the initial TGT for the host using the password
-    my $creds = Authen::Krb5::get_init_creds_password( $cprinc, $password );
+    my $creds = get_creds_with_passwd( $host_principal, $password );
     Authen::Krb5::Ccache::initialize( $ccache, $cprinc );
     $ccache->store_cred($creds);
 
@@ -229,8 +295,6 @@ sub kt_write {
     my $ktab = Authen::Krb5::kt_resolve( $keytab );
     my $ktentry = Authen::Krb5::KeytableEntry->new( $cprinc, $kvno, $creds->keyblock() );
     $ktab->add_entry( $ktentry );
-
-    Authen::Krb5::free_context( $krb5con );
 }
 
 1;

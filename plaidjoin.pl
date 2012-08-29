@@ -509,8 +509,8 @@ print "Setting project credentials cache to '$krb5ccname'\n";
 $ENV{KRB5CCNAME} = $krb5ccname;
 
 print "Getting initial credentials via 'kinit'.\n";
-system("kinit $cprinc") == 0
-    or die "system call to 'kinit' failed, can't continue. Error code: $?";
+kinit( $cprinc, $krb5ccname )
+    or die "kinit failed, can't continue: $!";
 print "Credentials cached in $krb5ccname\n";
 
 $ldap = gen_ldap_bind( $domain_controller );
@@ -622,7 +622,7 @@ print "Finding the supported encryption types.\n";
 
 finalize_machine_account( $ldap, $upcase_nodename, $baseDN, $userAccountControlBASE, $dryrun );
 
-kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, \@enc_types );
+kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, $krb5ccname, );
 
 if ($setup_config) {
     setup_krb_files( $krb5conf, $keytab_file, $dryrun );
