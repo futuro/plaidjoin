@@ -299,7 +299,7 @@ sub kt_write {
 
     # Write out the keytab for the stored credentials
     my $ktab = Authen::Krb5::kt_resolve( $keytab );
-    my $ktentry = Authen::Krb5::KeytableEntry->new( $cprinc, $kvno, $creds->keyblock() );
+    my $ktentry = Authen::Krb5::KeytabEntry->new( $cprinc, $kvno, $creds->keyblock() );
     $ktab->add_entry( $ktentry );
 }
 
