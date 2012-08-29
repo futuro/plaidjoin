@@ -4,6 +4,10 @@ use strict;
 use warnings;
 
 use Authen::Krb5;
+
+use Term::ReadLine;
+use Term::ReadKey;
+
 use Net::Domain      qw(hostfqdn);
 use String::MkPasswd qw(mkpasswd);
 use File::Copy       qw(cp);
