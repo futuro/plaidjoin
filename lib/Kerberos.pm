@@ -19,8 +19,9 @@ BEGIN {
     our @ISA = qw(Exporter);
 
     # Functions and variables which are exported by default
-    our @EXPORT =qw(
-        setup_krb_files kinit kt_write generate_and_set_passwd construct_krb5_conf );
+    our @EXPORT = qw(
+        setup_krb_files kinit kt_write generate_and_set_passwd construct_krb5_conf
+        get_creds_with_passwd );
 }
 
 my $def_ktab = '/tmp/plaidjoin.keytab';
