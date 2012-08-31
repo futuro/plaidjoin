@@ -8,6 +8,7 @@ use Authen::Krb5;
 use Term::ReadLine;
 use Term::ReadKey;
 
+use Expect           qw();
 use Net::Domain      qw(hostfqdn);
 use String::MkPasswd qw(mkpasswd);
 use File::Copy       qw(cp);
@@ -269,33 +270,50 @@ sub kinit {
 
 # Create a keytab file for the machine account
 # Input:
-#   Str : The password for the machine account
-#   Str : the fqdn for the machine
-#   Str : the realm for the machine
-#   Num : the kvno for the machine
-#   Str : The keytab filename for the machine
+#   Str        : The password for the machine account
+#   Str        : the fqdn for the machine
+#   Str        : the realm for the machine
+#   Num        : the kvno for the machine
+#   Str        : The keytab filename for the machine (default  : plaidjoin.keytab)
+#   Ref[Array] : A reference to the array of encryption types.
 # Output:
 #   N/A
 sub kt_write {
-    my $password   = (shift or '');
-    my $fqdn       = (shift or '');
-    my $realm      = (shift or '');
-    my $kvno       = (shift or 1);
-    my $keytab     = (shift or $def_ktab);
+    my $password  = (shift or '');
+    my $fqdn      = (shift or '');
+    my $realm     = (shift or '');
+    my $kvno      = (shift or 1);
+    my $keytab    = (shift or 'plaidjoin.keytab');
+    my @enc_types = @{(shift or [])};
 
-    my $host_principal = "host/".$fqdn."@".$realm;
+    my $host_principal = $fqdn."@".$realm;
 
-    my $cprinc = Authen::Krb5::parse_name( $host_principal );
+    my $spawn_ok;
+    my $timeout = 10;
 
-    # Get the initial TGT for the host using the password
-    my $creds = get_creds_with_passwd( $host_principal, $password );
+    my $ktutil = Expect->spawn("ktutil")
+        or die "Cannot spawn ktutil: $!";
 
-    # Write out the keytab for the stored credentials
-    # XXX TODO This doesn't actually work. However this is writing the keytab, it's not doing
-    #          it properly. I can't use the keytab to authenticate, but using the password is fine.
-    my $ktab = Authen::Krb5::kt_resolve( $keytab );
-    my $ktentry = Authen::Krb5::KeytabEntry->new( $cprinc, $kvno, $creds->keyblock() );
-    $ktab->add_entry( $ktentry );
+    foreach my $encryption_type (@enc_types) {
+        unless ($ktutil->expect($timeout, 'ktutil:')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $spawn_ok = 1;
+        $ktutil->send("addent -password -p host/$host_principal -k $kvno -e $encryption_type\n");
+
+        unless ($ktutil->expect($timeout, 'Password for host')){
+            die "ERROR: Can't talk to ktutil, dying.";
+        }
+        $ktutil->send("$password\n");
+    }
+
+    unless ($ktutil->expect($timeout, 'ktutil:')){
+        die "ERROR: Couldn't write keytab file before losing connection to ktutil; dying.";
+    }
+    $ktutil->send("write_kt $keytab\n");
+    $ktutil->send("quit\n");
+    $ktutil->soft_close();
+
 }
 
 1;
