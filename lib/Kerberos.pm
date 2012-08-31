@@ -282,22 +282,17 @@ sub kt_write {
     my $realm      = (shift or '');
     my $kvno       = (shift or 1);
     my $keytab     = (shift or $def_ktab);
-    my $hostccname = (shift or 'FILE:/tmp/plaidjoin.hostcc');
 
     my $host_principal = "host/".$fqdn."@".$realm;
 
-    # TODO: This seems like the wrong place to have this. I should think some more about having a
-    # 'kinit' function that will handle this context initiation, along with the getting creds
-    # from the user (not the host creds, mind you).
     my $cprinc = Authen::Krb5::parse_name( $host_principal );
-    my $ccache = Authen::Krb5::cc_resolve( $hostccname );
 
     # Get the initial TGT for the host using the password
     my $creds = get_creds_with_passwd( $host_principal, $password );
-    Authen::Krb5::Ccache::initialize( $ccache, $cprinc );
-    $ccache->store_cred($creds);
 
     # Write out the keytab for the stored credentials
+    # XXX TODO This doesn't actually work. However this is writing the keytab, it's not doing
+    #          it properly. I can't use the keytab to authenticate, but using the password is fine.
     my $ktab = Authen::Krb5::kt_resolve( $keytab );
     my $ktentry = Authen::Krb5::KeytabEntry->new( $cprinc, $kvno, $creds->keyblock() );
     $ktab->add_entry( $ktentry );

@@ -622,7 +622,7 @@ print "Finding the supported encryption types.\n";
 
 finalize_machine_account( $ldap, $upcase_nodename, $baseDN, $userAccountControlBASE, $dryrun );
 
-kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, $krb5ccname, );
+kt_write( $machine_passwd, $fqdn, $realm, $kvno, $keytab_file, );
 
 if ($setup_config) {
     setup_krb_files( $krb5conf, $keytab_file, $dryrun );
