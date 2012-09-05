@@ -141,6 +141,10 @@ sub deduce_and_set_enc_types {
         die   "Maybe add support for $^O in subroutine 'deduce_and_set_enc_type'.\n";
     }
 
+    if (!%enc_info){
+        die "No supported encryption types found; quitting";
+    }
+
     if (${enc_info}{minkeysize} == 128 and ${enc_info}{maxkeysize} == 256) {
         $val              = 0x18;
         $aes128_supported = 1;
